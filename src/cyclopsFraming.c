@@ -4,7 +4,8 @@
 
 #include "cyclopsFraming.h"
 #include <assert.h>
-#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int createRawPreamble(TX_SYMBOL_DATATYPE *rawPreambleBuf, TX_MODTYPE_DATATYPE *preambleModulationBuf){
     static_assert(sizeof(TX_SYMBOL_DATATYPE)*8 >= MAX_BITS_PER_SYMBOL, "MAX_BITS_PER_SYMBOL must fit within TX_SYMBOL_DATATYPE");
@@ -22,10 +23,6 @@ int createRawPreamble(TX_SYMBOL_DATATYPE *rawPreambleBuf, TX_MODTYPE_DATATYPE *p
 }
 
 int createRawHeader(TX_SYMBOL_DATATYPE *rawHeaderBuf, TX_MODTYPE_DATATYPE *headerModulationBuf, uint8_t modType, uint8_t type, uint8_t src, uint8_t dst, uint16_t netID, uint16_t length){
-    //Header is BPSK
-    int symbolsPerByteArg = 8;
-    uint8_t byteArgMask = 1;
-
     int headerInd = 0;
 
     //Mod Type
@@ -51,7 +48,7 @@ int createRawHeader(TX_SYMBOL_DATATYPE *rawHeaderBuf, TX_MODTYPE_DATATYPE *heade
 
 int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulationBuf, uint64_t val, uint8_t bitsPerVal, uint8_t bitsPerSymbol, uint8_t symbolRepetitions){
     int symbolsPerVal = bitsPerVal/bitsPerSymbol;
-    uint64_t valMask = (1 << bitsPerSymbol)-1;
+    uint64_t valMask = (((uint64_t)1) << bitsPerSymbol)-1;
 
     int modType;
     switch(bitsPerSymbol){
@@ -193,4 +190,195 @@ int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
     arrayIndex += createCRC(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, bitsPerPayloadSymbol);
 
     return arrayIndex;
+}
+
+int filterRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_STROBE_DATATYPE* rawStrobe, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen){
+    int dstInd = 0;
+
+    for(int i = 0; i<rawLen; i++){
+        if(rawValid[i] && rawStrobe[i]){
+            resultPacked[dstInd] = rawPacked[i];
+            resultPackedLast[dstInd] = rawPackedLast[i];
+            dstInd++;
+        }
+    }
+
+    return dstInd;
+}
+
+void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, int* byteInPacket, uint8_t* modMode, uint8_t* type, uint8_t* src, uint8_t *dst, int16_t *netID, int16_t *length, bool printDetails){
+    static_assert((HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8)%sizeof(*packedFiltered) == 0, "For now, header must be a multiple of the size of RX_PACKED_DATATYPE");
+    static_assert(BPSK_PAYLOAD_LEN_BYTES%sizeof(*packedFiltered) == 0, "For now, BPSK packet length must be a multiple of the size of RX_PACKED_DATATYPE");
+    static_assert(QPSK_PAYLOAD_LEN_BYTES%sizeof(*packedFiltered) == 0, "For now, QPSK packet length must be a multiple of the size of RX_PACKED_DATATYPE");
+    static_assert(QAM16_PAYLOAD_LEN_BYTES%sizeof(*packedFiltered) == 0, "For now, 16QAM packet length must be a multiple of the size of RX_PACKED_DATATYPE");
+    static_assert(CRC_BYTES_LEN%sizeof(*packedFiltered) == 0, "For now, CRC Checksum length must be a multiple of the size of RX_PACKED_DATATYPE");
+
+    int bytesPerPacked = sizeof(*packedFiltered);
+    int packetFilteredByteLen = packedFilteredLen*bytesPerPacked;
+
+    int byteInPacketLocal = *byteInPacket;
+    uint8_t *packetFilteredBytes = (uint8_t*) packedFiltered;
+    uint8_t *netIDBytes = (uint8_t*) netID;
+    uint8_t *lengthBytes = (uint8_t*) length;
+
+    int packedByteInd = 0;
+
+    while(packedByteInd<packetFilteredByteLen) {
+
+        if(byteInPacketLocal<(HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8)) {
+            //Parsing the header
+            //We do this 1 byte at a time.
+            switch(byteInPacketLocal){
+                case 0:
+                    *modMode = packetFilteredBytes[packedByteInd];
+                    break;
+                case 1:
+                    *type = packetFilteredBytes[packedByteInd];
+                    break;
+                case 2:
+                    *src = packetFilteredBytes[packedByteInd];
+                    break;
+                case 3:
+                    *dst = packetFilteredBytes[packedByteInd];
+                    break;
+                case 4:
+                    netIDBytes[0] = packetFilteredBytes[packedByteInd];
+                    break;
+                case 5:
+                    netIDBytes[1] = packetFilteredBytes[packedByteInd];
+                    break;
+                case 6:
+                    lengthBytes[0] = packetFilteredBytes[packedByteInd];
+                    break;
+                case 7:
+                    lengthBytes[1] = packetFilteredBytes[packedByteInd];
+                    break;
+                default:
+                    //Should never get here
+                    printf("Parsing Error\n");
+                    exit(1);
+            }
+
+            if(byteInPacketLocal==7){
+                if(printDetails){
+                    char *modLabel;
+                    switch(*modMode){
+                        case MOD_TYPE_BPSK:
+                            modLabel = "BPSK";
+                            break;
+                        case MOD_TYPE_QPSK:
+                            modLabel = "QPSK";
+                            break;
+                        case MOD_TYPE_QAM16:
+                            modLabel = "16QAM";
+                            break;
+                        default:
+                            modLabel = "UNKNOWN";
+                            break;
+                    }
+
+                    printf("Packet Rx: Modulation Type = %s, Type = %d, Src = %d, Dst = %d, NET_ID = %d, LENGTH = %d\n", modLabel, *type, *src, *dst, *netID, *length);
+                }
+
+                int maxLen;
+                bool lenError = false;
+
+                switch(*modMode){
+                    case MOD_TYPE_BPSK:
+                        maxLen = BPSK_PAYLOAD_LEN_BYTES;
+                        break;
+                    case MOD_TYPE_QPSK:
+                        maxLen = QPSK_PAYLOAD_LEN_BYTES;
+                        break;
+                    case MOD_TYPE_QAM16:
+                        maxLen = QAM16_PAYLOAD_LEN_BYTES;
+                        break;
+                    default:
+                        maxLen = QAM16_PAYLOAD_LEN_BYTES;
+                        break;
+                }
+
+                if(*length > maxLen){
+                    *length = maxLen;
+                    lenError = true;
+                }
+
+                if(printDetails && lenError){
+                    printf("Length Error\n");
+
+                }
+            }
+            byteInPacketLocal++;
+            packedByteInd++;
+        }else if(byteInPacketLocal < *length){
+            //TODO: Relies on header being a multiple of the packed length
+
+            int packedInd = packedByteInd/bytesPerPacked;
+
+            int packedIndInPayload = byteInPacketLocal/bytesPerPacked - HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8/bytesPerPacked;
+            int remainingPacked = (*length+(*length)%bytesPerPacked)/bytesPerPacked - packedIndInPayload;
+            int maxPackedInd = packedInd+remainingPacked;
+            if(maxPackedInd > packedFilteredLen){
+                maxPackedInd = packedFilteredLen;
+            }
+
+            int lastInd = -1;
+            for(int i = packedInd; i<maxPackedInd; i++){
+                if(packedFilteredLast[i]){
+                    lastInd = i;
+                    break;
+                }
+            }
+
+            //Print the payload
+            if(lastInd < 0){
+                //Did not find a last, print up to (but not including) the maxPacketInd
+                int maxByteInd = maxPackedInd*bytesPerPacked;
+                int byteLen = maxByteInd-packedByteInd;
+                fwrite(packetFilteredBytes+packedByteInd, sizeof(char), byteLen, stdout);
+                byteInPacketLocal = maxByteInd;
+                packedByteInd += byteLen;
+            }else{
+                //print up to (including) the last point then set byteInPacketLocal back to 0
+                int maxByteInd = (lastInd+1)*bytesPerPacked;
+                int byteLen = maxByteInd-packedByteInd;
+                fwrite(packetFilteredBytes+packedByteInd, sizeof(char), byteLen, stdout);
+                byteInPacketLocal = 0;
+                packedByteInd += byteLen;
+            }
+        }else{
+            //should be the CRC.  Search until a last is found
+            int packedInd = packedByteInd/bytesPerPacked;
+
+            int lastInd = -1;
+            for(int i = packedInd; i<packedFilteredLen; i++){
+                if(packedFilteredLast[i]){
+                    lastInd = i;
+                    break;
+                }
+            }
+
+            if(lastInd < 0){
+                //Did not find a last
+                int maxByteInd = packedFilteredLen*bytesPerPacked;
+                int byteLen = maxByteInd-packedByteInd;
+
+                byteInPacketLocal += byteLen;
+                packedByteInd += byteLen;
+            }else{
+                //Found last!  Reset for the next packet
+                int maxByteInd = (lastInd+1)*bytesPerPacked;
+                int byteLen = maxByteInd-packedByteInd;
+                if(byteInPacketLocal+byteLen != HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8+(*length)+CRC_BYTES_LEN){
+                    printf("Unexpected Position of Last Flag\n");
+                }
+
+                byteInPacketLocal = 0;
+                packedByteInd += byteLen;
+            }
+        }
+        //Print until length or last is reached
+    }
+
+    *byteInPacket = byteInPacketLocal;
 }

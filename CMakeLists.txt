@@ -7,6 +7,7 @@ add_compile_options("$<$<CONFIG:RELEASE>:-O3>")
 
 set(COMMON_SRCS
         src/cyclopsFraming.c
-        src/cyclopsFraming.h)
+        src/cyclopsFraming.h
+        src/vitisStructure.h)
 
 add_executable(cyclopsASCIILink src/main.c ${COMMON_SRCS})

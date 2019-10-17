@@ -49,6 +49,8 @@ cmake-build-debug
 docs
 buildCoverage
 covReport
+src/vitisIncludes/*
+!src/vitisIncludes/README
 
 #From https://intellij-support.jetbrains.com/hc/en-us/articles/206544839-How-to-manage-projects-under-Version-Control-Systems
 **/.idea/workspace.xml
