@@ -5,8 +5,8 @@ language: cpp
 # https://github.com/travis-ci/travis-ci/issues/7100
 
 before_install:
-  - git clone git@github.com:ucb-cyarp/cyclopsASCIILink-testfiles.git
-  - cp cyclopsASCIILink-testfiles/src/vitisIncludes/* ucb-cyarp/cyclopsASCIILink/src/vitisIncludes/.
+  - git clone git@github.com:ucb-cyarp/cyclopsASCIILink-testfiles.git ../cyclopsASCIILink-testfiles
+  - cp ../cyclopsASCIILink-testfiles/src/vitisIncludes/* src/vitisIncludes/.
 
 before_script:
   - if [[ "$COMPILER" = "g++-5"        ]] && [[ "$TRAVIS_OS_NAME" != "osx" ]]; then export CXX="g++-5" CC="gcc-5";              fi
