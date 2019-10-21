@@ -6,7 +6,7 @@ language: cpp
 
 before_install:
   - git clone git@github.com:ucb-cyarp/cyclopsASCIILink-testfiles.git
-  - cp cyclopsASCIILink-testfiles/vitisIncludes/* ucb-cyarp/cyclopsASCIILink/vitisIncludes/.
+  - cp cyclopsASCIILink-testfiles/src/vitisIncludes/* ucb-cyarp/src/cyclopsASCIILink/vitisIncludes/.
 
 before_script:
   - if [[ "$COMPILER" = "g++-5"        ]] && [[ "$TRAVIS_OS_NAME" != "osx" ]]; then export CXX="g++-5" CC="gcc-5";              fi
