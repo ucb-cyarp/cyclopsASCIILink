@@ -165,4 +165,6 @@ void* mainThread(void* argsUncast){
         free(txPacket);
         free(txModMode);
     }
+
+    return NULL;
 }
