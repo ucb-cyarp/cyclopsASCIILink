@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+#define _GNU_SOURCE //Need extra functions from sched.h to set thread affinity
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

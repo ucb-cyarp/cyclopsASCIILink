@@ -102,14 +102,13 @@ void* mainThread(void* argsUncast){
                         lastTxStartTime = currentTime;
                         txIndex = 0;
                         txIndex += sendData(txPipe, txPacket, txModMode, txPacketLen, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
+                    }else{
+                        //Write 0's
+                        //TODO: Change to a more optimized solution
+                        sendData(txPipe, txPacket, txModMode, 0, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
                     }
                 }
-            }else{
-                //Write 0's
-                //TODO: Change to a more optimized solution
-                sendData(txPipe, txPacket, txModMode, 0, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
             }
-
 
             for(int i = 0; i<maxBlocksToProcess; i++) {
                 //Check for feedback (use select)
