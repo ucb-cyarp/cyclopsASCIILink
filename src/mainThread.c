@@ -4,6 +4,7 @@
 
 #include "mainThread.h"
 #include <stdlib.h>
+#include <time.h>
 
 #include "helpers.h"
 #include "feedbackDefines.h"
