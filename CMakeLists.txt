@@ -19,4 +19,5 @@ set(COMMON_SRCS
         src/mainThread.c
         src/mainThread.h)
 
-add_executable(cyclopsASCIILink src/main.c ${COMMON_SRCS} ${CMAKE_THREAD_LIBS_INIT})
+add_executable(cyclopsASCIILink src/main.c ${COMMON_SRCS})
+target_link_libraries(cyclopsASCIILink ${CMAKE_THREAD_LIBS_INIT})
