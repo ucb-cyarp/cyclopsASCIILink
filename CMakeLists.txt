@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5.1)
 project(cyclopsASCIILink C)
 
+find_package(Threads)
+
 set(CMAKE_C_STANDARD 11)
 
 add_compile_options("$<$<CONFIG:RELEASE>:-O3>")
@@ -13,6 +15,8 @@ set(COMMON_SRCS
         src/feedbackDefines.h
         src/vitisStructure.h
         src/demoText.c
-        src/demoText.h)
+        src/demoText.h
+        src/mainThread.c
+        src/mainThread.h)
 
-add_executable(cyclopsASCIILink src/main.c ${COMMON_SRCS})
+add_executable(cyclopsASCIILink src/main.c ${COMMON_SRCS} ${CMAKE_THREAD_LIBS_INIT})
