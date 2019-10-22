@@ -9,10 +9,10 @@
 
 // ** This file should be modified to include the header definition for the vitis I/O Pipes **
 #include "vitisIncludes/vitisTypes.h"
-#include "vitisIncludes/rx_combined_man_partition_io_linux_pipe.h"
-#include "vitisIncludes/transmitter_man_partition_io_linux_pipe.h"
-#include "vitisIncludes/rx_combined_man_partition_parameters.h"
-#include "vitisIncludes/transmitter_man_partition_parameters.h"
+#include "vitisIncludes/rx_demo_io_linux_pipe.h"
+#include "vitisIncludes/tx_demo_io_linux_pipe.h"
+#include "vitisIncludes/rx_demo_parameters.h"
+#include "vitisIncludes/tx_demo_parameters.h"
 
 #define BOOL_TYPE vitisBool_t
 
@@ -20,8 +20,8 @@
 // ++ Transmitter ++
 #define TX_AVAILABLE true
 
-#define TX_BLOCK_SIZE TRANSMITTER_MAN_PARTITION_BLOCK_SIZE
-#define TX_STRUCTURE_TYPE_NAME transmitter_man_partition_inputs_bundle_1_t
+#define TX_BLOCK_SIZE TX_DEMO_BLOCK_SIZE
+#define TX_STRUCTURE_TYPE_NAME tx_demo_inputs_bundle_1_t
 
 #define TX_SYMBOL_MEMBER_NAME symbol_BUNDLE_1_inPort0_re
 #define TX_SYMBOL_DATATYPE uint8_t
@@ -42,8 +42,8 @@
 // ++ Receiver ++
 #define RX_AVAILABLE true
 
-#define RX_BLOCK_SIZE RX_COMBINED_MAN_PARTITION_BLOCK_SIZE
-#define RX_STRUCTURE_TYPE_NAME rx_combined_man_partition_outputs_bundle_2_t
+#define RX_BLOCK_SIZE RX_DEMO_BLOCK_SIZE
+#define RX_STRUCTURE_TYPE_NAME rx_demo_outputs_bundle_2_t
 
 #define RX_PACKED_MEMBER_NAME packed_symbol_BUNDLE_2_outPort25_re
 #define RX_PACKED_DATATYPE uint8_t
