@@ -19,17 +19,16 @@ bool isReadyForReading(FILE* file){
     int maxFD = fileFD;
 
     //Timeout quickly
-    struct timeval timeout;
+    struct timespec timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = 0;
+    timeout.tv_nsec = 0;
 
-    int selectStatus = select(maxFD, &fdSet, NULL, NULL, &timeout);
+    int selectStatus = pselect(maxFD+1, &fdSet, NULL, NULL, &timeout, NULL);
     if(selectStatus == -1){
         fprintf(stderr, "Error while checking if a file is ready for reading\n");
         perror(NULL);
         exit(1);
     }
-
     return FD_ISSET(fileFD, &fdSet);
 }
 
@@ -85,6 +84,7 @@ int sendData(FILE* pipe, const TX_SYMBOL_DATATYPE* txPacket, const TX_MODTYPE_DA
 
     //Write to pipe
     int elementsWritten = fwrite(txStruct, sizeof(TX_STRUCTURE_TYPE_NAME), blockInd, pipe);
+    fflush(pipe);
     if (elementsWritten != blockInd && ferror(pipe)){
         printf("An error was encountered while writing\n");
         perror(NULL);
