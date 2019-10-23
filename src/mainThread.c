@@ -27,6 +27,7 @@ void* mainThread(void* argsUncast){
 
     if(rxPipeName != NULL){
         rxPipe= fopen(rxPipeName, "rb");
+        printf("Opening Rx Pipe: %s\n", rxPipeName);
         if(rxPipe == NULL) {
             printf("Unable to open Rx Pipe ... exiting\n");
             perror(NULL);
@@ -36,6 +37,7 @@ void* mainThread(void* argsUncast){
 
     if(txPipeName != NULL){
         txPipe = fopen(txPipeName, "wb");
+        printf("Opening Tx Pipe: %s\n", txPipeName);
         if(txPipe == NULL){
             printf("Unable to open Tx Pipe ... exiting\n");
             perror(NULL);
@@ -43,6 +45,7 @@ void* mainThread(void* argsUncast){
         }
 
         txFeedbackPipe = fopen(txFeedbackPipeName, "rb");
+        printf("Opening Tx Feedback Pipe: %s\n", txFeedbackPipeName);
         if(txFeedbackPipe == NULL) {
             printf("Unable to open Tx Feedback Pipe ... exiting\n");
             perror(NULL);
