@@ -65,8 +65,8 @@ void* mainThread(void* argsUncast){
     //If transmitting, allocate arrays and form a Tx packet
     if(txPipe != NULL){
         //Craft a packet to send
-        txPacket = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PAYLOAD_PLUS_CRC_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        txModMode = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PAYLOAD_PLUS_CRC_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txPacket = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txModMode = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
 
         txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 4, testText, &msgBytesRead); //Encode a 16QAM Packet
 //        txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 2, testText, &msgBytesRead); //Encode a QPSK Packet
@@ -97,6 +97,7 @@ void* mainThread(void* argsUncast){
                 if(txIndex<txPacketLen){
                     //Check if we are currently sending a packet
                     //Send a packet
+                    // printf("In process of sending packet\n");
                     txIndex += sendData(txPipe, txPacket+txIndex, txModMode+txIndex, txPacketLen-txIndex, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
                 }else{
                     //Should we be sending
@@ -105,6 +106,7 @@ void* mainThread(void* argsUncast){
                     if(duration >= txPeriod){
                         lastTxStartTime = currentTime;
                         txIndex = 0;
+                        printf("Starting to send packet\n");
                         txIndex += sendData(txPipe, txPacket, txModMode, txPacketLen, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
                     }else{
                         //Write 0's
@@ -154,10 +156,24 @@ void* mainThread(void* argsUncast){
                 //done reading
                 running = false;
             }
+            // if(rawElementsRead>0){
+            //     //printf("Rx %d elements\n", rawElementsRead);
+            //     bool foundValid = false;
+            //     for(int i = 0; i<rawElementsRead; i++){
+            //         foundValid |= rxPackedValid[i];
+            //         // printf("Strobe: %d, Valid: %d, Last %d\n", rxPackedStrobe[i], rxPackedValid[i], rxPackedLast[i]);
+            //     }
+            //     if(foundValid){
+            //         printf("Found Valid\n");
+            //     }
+            // }
 
             RX_PACKED_DATATYPE rxPackedDataFiltered[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_PACKED_LAST_DATATYPE rxPackedLastFiltered[RX_BLOCK_SIZE*maxBlocksToProcess];
             int filteredElements  = filterRxData(rxPackedDataFiltered, rxPackedLastFiltered, rxPackedData, rxPackedLast, rxPackedStrobe, rxPackedValid, rawElementsRead);
+            // if(filteredElements>0){
+            //     printf("Number Filtered Elements: %d\n", filteredElements);
+            // }
 
             printPacket(rxPackedDataFiltered, rxPackedLastFiltered, filteredElements, &rxByteInPacket, &rxModMode, &rxType, &rxSrc, &rxDst, &rxNetID, &rxLength, true);
         }

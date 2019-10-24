@@ -11,7 +11,7 @@
 
 bool isReadyForReading(FILE* file);
 
-//Returns the number of elements written
+//Returns the number of elements (not blocks) written
 int sendData(FILE* pipe, const TX_SYMBOL_DATATYPE* txPacket, const TX_MODTYPE_DATATYPE* txModMode, int maxLenAvail, TX_GAIN_DATATYPE gain, int maxTokens, int *tokens);
 
 //Returns the number of elements (not blocks) read

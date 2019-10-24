@@ -146,7 +146,7 @@ int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulati
         case 2:
             modType = MOD_TYPE_QPSK;
             break;
-        case 3:
+        case 4:
             modType = MOD_TYPE_QAM16;
             break;
         default:
@@ -190,16 +190,16 @@ int createRawASCIIPayload(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
                 case 2:
                     paddingByte = PADDING_BYTE_QPSK;
                     break;
-                case 3:
+                case 4:
                     paddingByte = PADDING_BYTE_QAM16;
                     break;
                 default:
                     paddingByte = PADDING_BYTE_BPSK;
                     break;
             }
-            arrayIndex += unpackToSymbols(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, paddingByte, 8, bitsPerSymbol, TX_REPITIONS_PER_SYMBOL);
+            arrayIndex += unpackToSymbols(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, paddingByte, sizeof(*message)*8, bitsPerSymbol, TX_REPITIONS_PER_SYMBOL);
         }else{
-            arrayIndex += unpackToSymbols(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, message[msgIndex], 8, bitsPerSymbol, TX_REPITIONS_PER_SYMBOL);
+            arrayIndex += unpackToSymbols(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, message[msgIndex], sizeof(*message)*8, bitsPerSymbol, TX_REPITIONS_PER_SYMBOL);
         }
 
         msgIndex++;
@@ -228,7 +228,7 @@ int createCRC(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuf
             case 2:
                 paddingByte = PADDING_BYTE_QPSK;
                 break;
-            case 3:
+            case 4:
                 paddingByte = PADDING_BYTE_QAM16;
                 break;
             default:
@@ -255,7 +255,7 @@ int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
             modType = MOD_TYPE_QPSK;
             msgLen = QPSK_PAYLOAD_LEN_BYTES;
             break;
-        case 3:
+        case 4:
             modType = MOD_TYPE_QAM16;
             msgLen = QAM16_PAYLOAD_LEN_BYTES;
             break;
@@ -266,16 +266,22 @@ int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
     }
 
     //Preamble
+    // printf("Index: %d\n", arrayIndex);
     arrayIndex += createRawPreamble(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex);
 
     //Header
+    // printf("Index: %d\n", arrayIndex);
     arrayIndex += createRawHeader(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, modType, 0, src, dst, netID, msgLen);
 
     //Payload
+    // printf("Index: %d\n", arrayIndex);
     arrayIndex += createRawASCIIPayload(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, message, msgLen, bitsPerPayloadSymbol, msgBytesRead);
 
     //CRC
+    // printf("Index: %d\n", arrayIndex);
     arrayIndex += createCRC(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, bitsPerPayloadSymbol);
+
+    // printf("Index: %d\n", arrayIndex);
 
     return arrayIndex;
 }
