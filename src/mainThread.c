@@ -68,9 +68,9 @@ void* mainThread(void* argsUncast){
         txPacket = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txModMode = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
 
-        txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 4, testText, &msgBytesRead); //Encode a 16QAM Packet
+//        txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 4, testText, &msgBytesRead); //Encode a 16QAM Packet
 //        txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 2, testText, &msgBytesRead); //Encode a QPSK Packet
-//        txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 1, testText, &msgBytesRead); //Encode a BPSK Packet
+        txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 1, testText, &msgBytesRead); //Encode a BPSK Packet
     }
 
     //Tx State
@@ -85,6 +85,10 @@ void* mainThread(void* argsUncast){
     uint8_t rxDst = 0;
     int16_t rxNetID = 0;
     int16_t rxLength = 0;
+    RX_PACKED_DATATYPE remainingPacked = 0;
+    RX_PACKED_LAST_DATATYPE remainingLast = false;
+    int remainingBits = 0;
+    int rxCount = 0;
 
     //Main Loop
     bool running = true;
@@ -170,12 +174,12 @@ void* mainThread(void* argsUncast){
 
             RX_PACKED_DATATYPE rxPackedDataFiltered[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_PACKED_LAST_DATATYPE rxPackedLastFiltered[RX_BLOCK_SIZE*maxBlocksToProcess];
-            int filteredElements  = filterRxData(rxPackedDataFiltered, rxPackedLastFiltered, rxPackedData, rxPackedLast, rxPackedStrobe, rxPackedValid, rawElementsRead);
+            int filteredElements  = filterRepackRxData(rxPackedDataFiltered, rxPackedLastFiltered, rxPackedData, rxPackedLast, rxPackedStrobe, rxPackedValid, rawElementsRead, &remainingPacked, &remainingLast, &remainingBits);
             // if(filteredElements>0){
             //     printf("Number Filtered Elements: %d\n", filteredElements);
             // }
 
-            printPacket(rxPackedDataFiltered, rxPackedLastFiltered, filteredElements, &rxByteInPacket, &rxModMode, &rxType, &rxSrc, &rxDst, &rxNetID, &rxLength, true);
+            printPacket(rxPackedDataFiltered, rxPackedLastFiltered, filteredElements, &rxByteInPacket, &rxModMode, &rxType, &rxSrc, &rxDst, &rxNetID, &rxLength, true, &rxCount);
         }
     }
 

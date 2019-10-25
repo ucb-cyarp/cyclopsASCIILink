@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 const uint8_t cyclopsPreambleSymbols[] =
         {1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1,
@@ -286,21 +287,46 @@ int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
     return arrayIndex;
 }
 
-int filterRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_STROBE_DATATYPE* rawStrobe, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen){
+int filterRepackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_STROBE_DATATYPE* rawStrobe, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits){
     int dstInd = 0;
+
+    static_assert(sizeof(RX_PACKED_DATATYPE)*8 % RX_PACKED_BITS == 0, "RX_PACKED_DATATYPE must be a multiple of RX_PACKED_BITS"); //Simplfies computation for now
+    static_assert(sizeof(RX_PACKED_DATATYPE) == 1, "For now, restriciting RX_PACKED_DATATYPE to bytes for sanitization code"); //TODO: change
+
+    int currentBits = *remainingBits;
+    RX_PACKED_DATATYPE repackedLocal = *remainingPacked;
+    RX_PACKED_LAST_DATATYPE repackedLastLocal = *remainingLast;
+
+    int newShiftAmt = sizeof(RX_PACKED_DATATYPE)*8 - RX_PACKED_BITS;
 
     for(int i = 0; i<rawLen; i++){
         if(rawValid[i] && rawStrobe[i]){
-            resultPacked[dstInd] = rawPacked[i];
-            resultPackedLast[dstInd] = rawPackedLast[i];
-            dstInd++;
+            repackedLocal = (rawPacked[i] << newShiftAmt)|(repackedLocal >> RX_PACKED_BITS);
+            repackedLastLocal = repackedLastLocal || rawPackedLast[i];
+            currentBits += RX_PACKED_BITS;
+            if(currentBits == sizeof(RX_PACKED_DATATYPE)*8){
+                //Complete, store
+                resultPacked[dstInd] = repackedLocal;
+                resultPackedLast[dstInd] = repackedLastLocal;
+                // printf("0b%d%d%d%d %d%d%d%d [%c] (%d)\n", (resultPacked[dstInd]>>7)&1, (resultPacked[dstInd]>>6)&1, (resultPacked[dstInd]>>5)&1, (resultPacked[dstInd]>>4)&1, (resultPacked[dstInd]>>3)&1, (resultPacked[dstInd]>>2)&1, (resultPacked[dstInd]>>1)&1, (resultPacked[dstInd])&1, resultPacked[dstInd], resultPackedLast[dstInd]);
+                dstInd++;
+
+                //Reset state
+                currentBits = 0;
+                repackedLocal = 0;
+                repackedLastLocal = false;
+            }
         }
     }
+
+    *remainingBits = currentBits;
+    *remainingPacked = repackedLocal;
+    *remainingLast = repackedLastLocal;
 
     return dstInd;
 }
 
-void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, int* byteInPacket, uint8_t* modMode, uint8_t* type, uint8_t* src, uint8_t *dst, int16_t *netID, int16_t *length, bool printDetails){
+void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, int* byteInPacket, uint8_t* modMode, uint8_t* type, uint8_t* src, uint8_t *dst, int16_t *netID, int16_t *length, bool printDetails, int *rxCount){
     static_assert((HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8)%sizeof(*packedFiltered) == 0, "For now, header must be a multiple of the size of RX_PACKED_DATATYPE");
     static_assert(BPSK_PAYLOAD_LEN_BYTES%sizeof(*packedFiltered) == 0, "For now, BPSK packet length must be a multiple of the size of RX_PACKED_DATATYPE");
     static_assert(QPSK_PAYLOAD_LEN_BYTES%sizeof(*packedFiltered) == 0, "For now, QPSK packet length must be a multiple of the size of RX_PACKED_DATATYPE");
@@ -354,6 +380,8 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
             }
 
             if(byteInPacketLocal==7){
+                (*rxCount)++;
+                printf("Packet Rx: #%d\n", *rxCount);
                 if(printDetails){
                     char *modLabel;
                     switch(*modMode){
@@ -371,7 +399,7 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                             break;
                     }
 
-                    printf("Packet Rx: Modulation Type = %s, Type = %d, Src = %d, Dst = %d, NET_ID = %d, LENGTH = %d\n", modLabel, *type, *src, *dst, *netID, *length);
+                    printf("Modulation Type = %s, Type = %d, Src = %d, Dst = %d, NET_ID = %d, LENGTH = %d\n", modLabel, *type, *src, *dst, *netID, *length);
                 }
 
                 int maxLen;
@@ -429,14 +457,27 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                 //Did not find a last, print up to (but not including) the maxPacketInd
                 int maxByteInd = maxPackedInd*bytesPerPacked;
                 int byteLen = maxByteInd-packedByteInd;
-                fwrite(packetFilteredBytes+packedByteInd, sizeof(char), byteLen, stdout);
+                char* printStart = packetFilteredBytes+packedByteInd;
+                for(int i = 0; i<byteLen; i++){//Sanitize
+                    if(!isprint(printStart[i])){
+                        printStart[i] = '^';
+                    }
+                }
+                fwrite(printStart, sizeof(char), byteLen, stdout);
                 byteInPacketLocal = maxByteInd;
                 packedByteInd += byteLen;
             }else{
                 //print up to (including) the last point then set byteInPacketLocal back to 0
                 int maxByteInd = (lastInd+1)*bytesPerPacked;
                 int byteLen = maxByteInd-packedByteInd;
-                fwrite(packetFilteredBytes+packedByteInd, sizeof(char), byteLen, stdout);
+                char* printStart = packetFilteredBytes+packedByteInd;
+                for(int i = 0; i<byteLen; i++){//Sanitize
+                    if(!isprint(printStart[i])){
+                        printStart[i] = '^';
+                    }
+                }
+                fwrite(printStart, sizeof(char), byteLen, stdout);
+                printf("\n==== End of Packet ====\n");
                 byteInPacketLocal = 0;
                 packedByteInd += byteLen;
             }
@@ -461,6 +502,7 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                 packedByteInd += byteLen;
             }else{
                 //Found last!  Reset for the next packet
+                printf("\n==== End of Packet ====\n");
                 int maxByteInd = (lastInd+1)*bytesPerPacked;
                 int byteLen = maxByteInd-packedByteInd;
                 if(byteInPacketLocal+byteLen != HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8+(*length)+CRC_BYTES_LEN){
