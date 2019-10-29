@@ -30,8 +30,8 @@ set(COMMON_SRCS
         src/demoText.h
         src/mainThread.c
         src/mainThread.h
-        src/SharedMemoryFIFO.c
-        src/SharedMemoryFIFO.h)
+        src/depends/BerkeleySharedMemoryFIFO.c
+        src/depends/BerkeleySharedMemoryFIFO.h)
 
 add_executable(cyclopsASCIILink src/main.c ${COMMON_SRCS})
 target_link_libraries(cyclopsASCIILink ${CMAKE_THREAD_LIBS_INIT} ${LIBRT})

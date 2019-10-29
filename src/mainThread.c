@@ -9,7 +9,7 @@
 #include "helpers.h"
 #include "feedbackDefines.h"
 #include "demoText.h"
-#include "SharedMemoryFIFO.h"
+#include "depends/BerkeleySharedMemoryFIFO.h"
 
 void* mainThread(void* argsUncast){
     threadArgs_t* args = (threadArgs_t*) argsUncast;
