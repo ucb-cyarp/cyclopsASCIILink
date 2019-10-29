@@ -9,48 +9,40 @@
 #include "helpers.h"
 #include "feedbackDefines.h"
 #include "demoText.h"
+#include "SharedMemoryFIFO.h"
 
 void* mainThread(void* argsUncast){
     threadArgs_t* args = (threadArgs_t*) argsUncast;
-    char *txPipeName = args->txPipeName;
-    char *txFeedbackPipeName = args->txFeedbackPipeName;
-    char *rxPipeName = args->rxPipeName;
+    char *txSharedName = args->txSharedName;
+    char *txFeedbackSharedName = args->txFeedbackSharedName;
+    char *rxSharedName = args->rxSharedName;
     double txPeriod = args->txPeriod;
     int32_t txTokens = args->txTokens;
     int32_t maxBlocksToProcess = args->maxBlocksToProcess;
+    int32_t fifoSize = args->fifoSize;
     TX_GAIN_DATATYPE gain = args->gain;
 
     //Open Pipes (if applicable)
-    FILE *rxPipe = NULL;
-    FILE *txPipe = NULL;
-    FILE *txFeedbackPipe = NULL;
+    sharedMemoryFIFO_t txFifo;
+    sharedMemoryFIFO_t rxFifo;
+    sharedMemoryFIFO_t txfbFifo;
 
-    if(rxPipeName != NULL){
-        rxPipe= fopen(rxPipeName, "rb");
-        printf("Opening Rx Pipe: %s\n", rxPipeName);
-        if(rxPipe == NULL) {
-            printf("Unable to open Rx Pipe ... exiting\n");
-            perror(NULL);
-            exit(1);
-        }
+    //Initialize producer FIFOs first
+    initSharedMemoryFIFO(&txFifo);
+    initSharedMemoryFIFO(&rxFifo);
+    initSharedMemoryFIFO(&txfbFifo);
+
+    size_t rxFifoBufferSizeBytes = sizeof(RX_STRUCTURE_TYPE_NAME)*fifoSize;
+    size_t txFifoBufferSizeBytes = sizeof(TX_STRUCTURE_TYPE_NAME)*fifoSize;
+    size_t txfbFifoBufferSizeBytes = sizeof(FEEDBACK_DATATYPE)*fifoSize;
+
+    if(txSharedName != NULL){
+        producerOpenInitFIFO(txSharedName, txFifoBufferSizeBytes, &txFifo);
+        consumerOpenFIFOBlock(txFeedbackSharedName, txfbFifoBufferSizeBytes, &txfbFifo);
     }
 
-    if(txPipeName != NULL){
-        txPipe = fopen(txPipeName, "wb");
-        printf("Opening Tx Pipe: %s\n", txPipeName);
-        if(txPipe == NULL){
-            printf("Unable to open Tx Pipe ... exiting\n");
-            perror(NULL);
-            exit(1);
-        }
-
-        txFeedbackPipe = fopen(txFeedbackPipeName, "rb");
-        printf("Opening Tx Feedback Pipe: %s\n", txFeedbackPipeName);
-        if(txFeedbackPipe == NULL) {
-            printf("Unable to open Tx Feedback Pipe ... exiting\n");
-            perror(NULL);
-            exit(1);
-        }
+    if(rxSharedName != NULL){
+        consumerOpenFIFOBlock(rxSharedName, rxFifoBufferSizeBytes, &rxFifo);
     }
 
     TX_SYMBOL_DATATYPE* txPacket;
@@ -63,7 +55,7 @@ void* mainThread(void* argsUncast){
     uint16_t txNetID = 10;
 
     //If transmitting, allocate arrays and form a Tx packet
-    if(txPipe != NULL){
+    if(txSharedName != NULL){
         //Craft a packet to send
         txPacket = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txModMode = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
@@ -93,7 +85,7 @@ void* mainThread(void* argsUncast){
     //Main Loop
     bool running = true;
     while(running){
-        if(txPipe!=NULL){
+        if(txSharedName!=NULL){
             //If transmissions are OK
             if(txTokens > 0) {
                 //Check if OK to send
@@ -102,7 +94,7 @@ void* mainThread(void* argsUncast){
                     //Check if we are currently sending a packet
                     //Send a packet
                     // printf("In process of sending packet\n");
-                    txIndex += sendData(txPipe, txPacket+txIndex, txModMode+txIndex, txPacketLen-txIndex, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
+                    txIndex += sendData(&txFifo, txPacket+txIndex, txModMode+txIndex, txPacketLen-txIndex, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
                 }else{
                     //Should we be sending
                     time_t currentTime = time(NULL);
@@ -111,34 +103,27 @@ void* mainThread(void* argsUncast){
                         lastTxStartTime = currentTime;
                         txIndex = 0;
                         printf("Starting to send packet\n");
-                        txIndex += sendData(txPipe, txPacket, txModMode, txPacketLen, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
+                        txIndex += sendData(&txFifo, txPacket, txModMode, txPacketLen, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
                     }else{
                         //Write 0's
                         //TODO: Change to a more optimized solution
-                        sendData(txPipe, txPacket, txModMode, 0, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
+                        sendData(&txFifo, txPacket, txModMode, 0, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
                     }
                 }
             }
 
             for(int i = 0; i<maxBlocksToProcess; i++) {
                 //Check for feedback (use select)
-                bool feedbackReady = isReadyForReading(txFeedbackPipe);
+                bool feedbackReady = isReadyForReading(&txfbFifo);
                 if(feedbackReady){
                     //Get feedback
                     FEEDBACK_DATATYPE tokensReturned;
                     //Once data starts coming, a full transaction should be in process.  Can block on the transaction.
-                    int elementsRead = fread(&tokensReturned, sizeof(tokensReturned), 1, txFeedbackPipe);
-                    if(elementsRead != 1 && feof(txFeedbackPipe)){
+                    int elementsRead = readFifo(&tokensReturned, sizeof(tokensReturned), 1, &txfbFifo);
+                    if(elementsRead != 1){
                         //Done!
                         running = false;
                         break;
-                    } else if (elementsRead != 1 && ferror(txFeedbackPipe)){
-                        printf("An error was encountered while reading the feedback pipe\n");
-                        perror(NULL);
-                        exit(1);
-                    } else if (elementsRead != 1){
-                        printf("An unknown error was encountered while reading the feedback pipe\n");
-                        exit(1);
                     }
                     txTokens += tokensReturned;
                 }else{
@@ -147,7 +132,7 @@ void* mainThread(void* argsUncast){
             }
         }
 
-        if(rxPipe!=NULL){
+        if(rxSharedName!=NULL){
             //Read and print
             RX_PACKED_DATATYPE rxPackedData[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_STROBE_DATATYPE rxPackedStrobe[RX_BLOCK_SIZE*maxBlocksToProcess];
@@ -155,7 +140,7 @@ void* mainThread(void* argsUncast){
             RX_PACKED_LAST_DATATYPE rxPackedLast[RX_BLOCK_SIZE*maxBlocksToProcess];
 
             bool isDoneReading = false;
-            int rawElementsRead = recvData(rxPipe, rxPackedData, rxPackedStrobe, rxPackedValid, rxPackedLast, maxBlocksToProcess, &isDoneReading);
+            int rawElementsRead = recvData(&rxFifo, rxPackedData, rxPackedStrobe, rxPackedValid, rxPackedLast, maxBlocksToProcess, &isDoneReading);
             if(isDoneReading){
                 //done reading
                 running = false;
@@ -183,10 +168,19 @@ void* mainThread(void* argsUncast){
         }
     }
 
-    if(txPipe != NULL){
+
+
+    if(txSharedName != NULL){
         //Cleanup
+        cleanupProducer(&txFifo);
+        cleanupConsumer(&txfbFifo);
+
         free(txPacket);
         free(txModMode);
+    }
+
+    if(rxSharedName != NULL){
+        cleanupConsumer(&rxFifo);
     }
 
     return NULL;

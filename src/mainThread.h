@@ -9,13 +9,14 @@
 #include "cyclopsFraming.h"
 
 typedef struct{
-char *txPipeName;
-char *txFeedbackPipeName;
-char *rxPipeName;
+char *txSharedName;
+char *txFeedbackSharedName;
+char *rxSharedName;
 
 double txPeriod;
 int32_t txTokens;
 int32_t maxBlocksToProcess;
+int32_t fifoSize; //Size in blocks
 TX_GAIN_DATATYPE gain;
 } threadArgs_t;
 
