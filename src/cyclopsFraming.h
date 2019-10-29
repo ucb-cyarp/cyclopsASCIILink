@@ -14,6 +14,7 @@
 #define MAX_PAYLOAD_SYMBOL_LEN (12256)
 #define CRC_BYTES_LEN (4)
 #define MAX_PAYLOAD_PLUS_CRC_SYMBOL_LEN (MAX_PAYLOAD_SYMBOL_LEN+CRC_BYTES_LEN*8) //BPSK
+#define MAX_PACKET_SYMBOL_LEN (PREAMBLE_SYMBOL_LEN+HEADER_SYMBOL_LEN+MAX_PAYLOAD_PLUS_CRC_SYMBOL_LEN)
 
 #define MAX_BITS_PER_SYMBOL (4)
 //#define BITS_PER_SYMBOL_PREAMBLE (1)
@@ -103,13 +104,14 @@ int createCRC(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuf
 //The arrays must be pre-allocated
 int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, uint8_t src, uint8_t dst, uint16_t netID, int bitsPerPayloadSymbol, const char* message, int* msgBytesRead);
 
-//Note: We can read directly from the packed data stream once filtering for valid and strobe
+//Note: We can read directly from the packed data stream once filtering for valid and strobe andf repacking
+//Sanitized for printable characters
 //Returns the number of filtered elements
-int filterRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_STROBE_DATATYPE* rawStrobe, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen);
+int filterRepackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_STROBE_DATATYPE* rawStrobe, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits);
 
 int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulationBuf, uint64_t val, uint8_t bitsPerVal, uint8_t bitsPerSymbol, uint8_t symbolRepitions);
 
 //The latter pointers are used to carry state between calls in case the header is in the middle of being parsed between 2 calls to the function.  Byte in packet is used to track if the
-void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, int* byteInPacket, uint8_t* modMode, uint8_t* type, uint8_t* src, uint8_t* dst, int16_t *netID, int16_t *length, bool printDetails);
+void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, int* byteInPacket, uint8_t* modMode, uint8_t* type, uint8_t* src, uint8_t* dst, int16_t *netID, int16_t *length, bool printDetails, int* rxCount);
 
 #endif //CYCLOPSASCIILINK_CYCLOPSFRAMING_H
