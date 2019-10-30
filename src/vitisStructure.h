@@ -46,16 +46,16 @@
 #define RX_BLOCK_SIZE RX_DEMO_BLOCK_SIZE
 #define RX_STRUCTURE_TYPE_NAME rx_demo_outputs_bundle_2_t
 
-#define RX_PACKED_MEMBER_NAME packed_symbol_BUNDLE_2_outPort25_re
+#define RX_PACKED_MEMBER_NAME packed_symbol_BUNDLE_2_outPort5_re
 #define RX_PACKED_DATATYPE uint8_t
 
-#define RX_STROBE_MEMBER_NAME strobe_BUNDLE_2_outPort6_re
+#define RX_STROBE_MEMBER_NAME strobe_BUNDLE_2_outPort0_re
 #define RX_STROBE_DATATYPE BOOL_TYPE
 
-#define RX_VALID_MEMBER_NAME packed_valid_BUNDLE_2_outPort24_re
+#define RX_VALID_MEMBER_NAME packed_valid_BUNDLE_2_outPort4_re
 #define RX_PACKED_VALID_DATATYPE BOOL_TYPE
 
-#define RX_LAST_MEMBER_NAME packed_last_BUNDLE_2_outPort28_re
+#define RX_LAST_MEMBER_NAME packed_last_BUNDLE_2_outPort6_re
 #define RX_PACKED_LAST_DATATYPE BOOL_TYPE
 
 #endif //CYCLOPSASCIILINK_VITISSTRUCTURE_H

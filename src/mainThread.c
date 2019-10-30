@@ -38,11 +38,14 @@ void* mainThread(void* argsUncast){
 
     if(txSharedName != NULL){
         producerOpenInitFIFO(txSharedName, txFifoBufferSizeBytes, &txFifo);
+        // printf("Opened Tx FIFO: %s\n", txSharedName);
         consumerOpenFIFOBlock(txFeedbackSharedName, txfbFifoBufferSizeBytes, &txfbFifo);
+        // printf("Opened TxFB FIFO: %s\n", txFeedbackSharedName);
     }
 
     if(rxSharedName != NULL){
         consumerOpenFIFOBlock(rxSharedName, rxFifoBufferSizeBytes, &rxFifo);
+        // printf("Opened Rx FIFO: %s\n", rxSharedName);
     }
 
     TX_SYMBOL_DATATYPE* txPacket;
@@ -102,9 +105,10 @@ void* mainThread(void* argsUncast){
                     if(duration >= txPeriod){
                         lastTxStartTime = currentTime;
                         txIndex = 0;
-                        printf("Starting to send packet\n");
+                        // printf("Starting to send packet\n");
                         txIndex += sendData(&txFifo, txPacket, txModMode, txPacketLen, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
                     }else{
+                        // printf("Sending Blank\n");
                         //Write 0's
                         //TODO: Change to a more optimized solution
                         sendData(&txFifo, txPacket, txModMode, 0, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
@@ -119,7 +123,9 @@ void* mainThread(void* argsUncast){
                     //Get feedback
                     FEEDBACK_DATATYPE tokensReturned;
                     //Once data starts coming, a full transaction should be in process.  Can block on the transaction.
+                    // printf("Recieving Feedback Data\n");
                     int elementsRead = readFifo(&tokensReturned, sizeof(tokensReturned), 1, &txfbFifo);
+                    // printf("Recieving Feedback Data\n");
                     if(elementsRead != 1){
                         //Done!
                         running = false;
@@ -133,6 +139,7 @@ void* mainThread(void* argsUncast){
         }
 
         if(rxSharedName!=NULL){
+            // printf("Got to RX\n");
             //Read and print
             RX_PACKED_DATATYPE rxPackedData[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_STROBE_DATATYPE rxPackedStrobe[RX_BLOCK_SIZE*maxBlocksToProcess];
@@ -140,7 +147,9 @@ void* mainThread(void* argsUncast){
             RX_PACKED_LAST_DATATYPE rxPackedLast[RX_BLOCK_SIZE*maxBlocksToProcess];
 
             bool isDoneReading = false;
+            // printf("About to Recieve Rx Data\n");
             int rawElementsRead = recvData(&rxFifo, rxPackedData, rxPackedStrobe, rxPackedValid, rxPackedLast, maxBlocksToProcess, &isDoneReading);
+            // printf("Recieved Rx Data\n");
             if(isDoneReading){
                 //done reading
                 running = false;
