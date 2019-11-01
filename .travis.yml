@@ -6,6 +6,9 @@ language: cpp
 
 before_install:
   - git clone git@github.com:ucb-cyarp/cyclopsASCIILink-testfiles.git ../cyclopsASCIILink-testfiles
+  - cd ../cyclopsASCIILink-testfiles
+  - git checkout 0903cbd33ee4eb866aca7cf12a39ebfcd70295b5
+  - cd -
   - cp ../cyclopsASCIILink-testfiles/vitisIncludes/* src/vitisIncludes/.
 
 before_script:
