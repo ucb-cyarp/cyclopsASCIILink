@@ -464,7 +464,7 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                     }
                 }
                 fwrite(printStart, sizeof(char), byteLen, stdout);
-                byteInPacketLocal = maxByteInd;
+                byteInPacketLocal += byteLen;
                 packedByteInd += byteLen;
             }else{
                 //print up to (including) the last point then set byteInPacketLocal back to 0
