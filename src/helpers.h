@@ -12,7 +12,19 @@
 bool isReadyForReading(FILE* file);
 
 //Returns the number of elements (not blocks) written
-int sendData(FILE* pipe, const TX_SYMBOL_DATATYPE* txPacket, const TX_MODTYPE_DATATYPE* txModMode, int maxLenAvail, TX_GAIN_DATATYPE gain, int maxTokens, int *tokens);
+int sendData(FILE* pipe, 
+             const TX_SYMBOL_DATATYPE* txPacket_ch0, 
+             const TX_MODTYPE_DATATYPE* txModMode_ch0, 
+             const TX_SYMBOL_DATATYPE* txPacket_ch1, 
+             const TX_MODTYPE_DATATYPE* txModMode_ch1, 
+             const TX_SYMBOL_DATATYPE* txPacket_ch2, 
+             const TX_MODTYPE_DATATYPE* txModMode_ch2, 
+             const TX_SYMBOL_DATATYPE* txPacket_ch3, 
+             const TX_MODTYPE_DATATYPE* txModMode_ch3, 
+             int maxLenAvail, 
+             TX_GAIN_DATATYPE gain, 
+             int maxTokens, 
+             int *tokens);
 
 //Returns the number of elements (not blocks) read
 int recvData(FILE* pipe, RX_PACKED_DATATYPE* rxPackedData, RX_STROBE_DATATYPE* rxPackedStrobe, RX_PACKED_VALID_DATATYPE* rxPackedValid, RX_PACKED_LAST_DATATYPE* rxPackedLast, int maxBlocks, bool* doneReading);

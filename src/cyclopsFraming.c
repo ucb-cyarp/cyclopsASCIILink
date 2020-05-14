@@ -460,7 +460,7 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                 int byteLen = maxByteInd-packedByteInd;
                 char* printStart = packetFilteredBytes+packedByteInd;
                 for(int i = 0; i<byteLen; i++){//Sanitize
-                    if(!isprint(printStart[i])){
+                    if(!isprint(printStart[i]) && printStart[i]!='\n'){
                         printStart[i] = '^';
                     }
                 }
@@ -473,7 +473,7 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                 int byteLen = maxByteInd-packedByteInd;
                 char* printStart = packetFilteredBytes+packedByteInd;
                 for(int i = 0; i<byteLen; i++){//Sanitize
-                    if(!isprint(printStart[i])){
+                    if(!isprint(printStart[i]) && printStart[i]!='\n'){
                         printStart[i] = '^';
                     }
                 }

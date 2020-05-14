@@ -5,10 +5,13 @@
 #include "mainThread.h"
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
 #include "helpers.h"
 #include "feedbackDefines.h"
 #include "demoText.h"
+
+#define TX_ID_MAX 64
 
 void* mainThread(void* argsUncast){
     threadArgs_t* args = (threadArgs_t*) argsUncast;
@@ -53,29 +56,54 @@ void* mainThread(void* argsUncast){
         }
     }
 
-    TX_SYMBOL_DATATYPE* txPacket;
-    TX_MODTYPE_DATATYPE* txModMode;
-    int txPacketLen = 0; //In terms of TX_SYMBOL_DATATYPE units
+    //Ch0
+    TX_SYMBOL_DATATYPE* txPacket_ch0;
+    TX_MODTYPE_DATATYPE* txModMode_ch0;
+    int txPacketLen_ch0 = 1; //In terms of TX_SYMBOL_DATATYPE units
+    //Ch1
+    TX_SYMBOL_DATATYPE* txPacket_ch1;
+    TX_MODTYPE_DATATYPE* txModMode_ch1;
+    int txPacketLen_ch1 = 1; //In terms of TX_SYMBOL_DATATYPE units
+    //Ch2
+    TX_SYMBOL_DATATYPE* txPacket_ch2;
+    TX_MODTYPE_DATATYPE* txModMode_ch2;
+    int txPacketLen_ch2 = 1; //In terms of TX_SYMBOL_DATATYPE units
+    //Ch3
+    TX_SYMBOL_DATATYPE* txPacket_ch3;
+    TX_MODTYPE_DATATYPE* txModMode_ch3;
+    int txPacketLen_ch3 = 1; //In terms of TX_SYMBOL_DATATYPE units
+    
     int msgBytesRead = 0;
-
     uint8_t txSrc = 0;
     uint8_t txDst = 1;
     uint16_t txNetID = 10;
 
+    char* blankStr = "";
+
     //If transmitting, allocate arrays and form a Tx packet
     if(txPipe != NULL){
-        //Craft a packet to send
-        txPacket = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        txModMode = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txPacket_ch0 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txModMode_ch0 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txPacket_ch1 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txModMode_ch1 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txPacket_ch2 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txModMode_ch2 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txPacket_ch3 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        txModMode_ch3 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
 
-//        txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 4, testText, &msgBytesRead); //Encode a 16QAM Packet
-//        txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 2, testText, &msgBytesRead); //Encode a QPSK Packet
-        txPacketLen =  createRawCyclopsFrame(txPacket, txModMode, txSrc, txDst, txNetID, 1, testText, &msgBytesRead); //Encode a BPSK Packet
+//        txPacketLen_ch0 =  createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txSrc, txDst, txNetID, 4, testText, &msgBytesRead); //Encode a 16QAM Packet
+//        txPacketLen_ch0 =  createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txSrc, txDst, txNetID, 2, testText, &msgBytesRead); //Encode a QPSK Packet
     }
 
     //Tx State
-    int txIndex = 0; //The current symbol to be transmitted in the packet
+    int txIndex = txPacketLen_ch0; //The current symbol to be transmitted in the packet
     time_t lastTxStartTime = time(NULL); //Will transmit after an initial gap
+
+    int txStrLoc = 0; //This is the location we are currently at when sending the txStr
+    const char* txStr = testTextLong;
+    int txStrLen = strlen(txStr);
+
+    int txID = 0; //This is the id number used to order packets
 
     //Rx State
     int rxByteInPacket = 0;
@@ -100,11 +128,23 @@ void* mainThread(void* argsUncast){
             if(txTokens > 0) {
                 //Check if OK to send
 
-                if(txIndex<txPacketLen){
+                if(txIndex<txPacketLen_ch0){
                     //Check if we are currently sending a packet
                     //Send a packet
                     // printf("In process of sending packet\n");
-                    txIndex += sendData(txPipe, txPacket+txIndex, txModMode+txIndex, txPacketLen-txIndex, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
+                    txIndex += sendData(txPipe, 
+                                            txPacket_ch0+txIndex, 
+                                            txModMode_ch0+txIndex, 
+                                            txPacket_ch1+txIndex, 
+                                            txModMode_ch1+txIndex, 
+                                            txPacket_ch2+txIndex, 
+                                            txModMode_ch2+txIndex, 
+                                            txPacket_ch3+txIndex, 
+                                            txModMode_ch3+txIndex, 
+                                            txPacketLen_ch0-txIndex, 
+                                            gain, 
+                                            maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
+                                            &txTokens);
                 }else{
                     //Should we be sending
                     time_t currentTime = time(NULL);
@@ -113,11 +153,76 @@ void* mainThread(void* argsUncast){
                         lastTxStartTime = currentTime;
                         txIndex = 0;
                         printf("Starting to send packet\n");
-                        txIndex += sendData(txPipe, txPacket, txModMode, txPacketLen, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
+                        //Create a new packet
+                        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, 1, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        //MsgBytesRead indicates how many bytes of the textToBeEncoded were read.  Add this to the text ptr passed to the next one
+                        txStrLoc+=msgBytesRead;
+                        txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
+                        if(txStrLoc>=txStrLen){
+                            //Got to the end of the string, wrap around
+                            txStrLoc = 0;
+                        }
+
+                        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, 1, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txStrLoc+=msgBytesRead;
+                        txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
+                        if(txStrLoc>=txStrLen){
+                            //Got to the end of the string, wrap around
+                            txStrLoc = 0;
+                        }
+
+                        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, 1, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txStrLoc+=msgBytesRead;
+                        txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
+                        if(txStrLoc>=txStrLen){
+                            //Got to the end of the string, wrap around
+                            txStrLoc = 0;
+                        }
+
+                        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, 1, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txStrLoc+=msgBytesRead;
+                        txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
+                        if(txStrLoc>=txStrLen){
+                            //Got to the end of the string, wrap around
+                            txStrLoc = 0;
+                        }
+
+                        if(txPacketLen_ch0 != txPacketLen_ch1 || txPacketLen_ch0 != txPacketLen_ch2 || txPacketLen_ch0 != txPacketLen_ch3){
+                            printf("Encountered an error generating packets");
+                            exit(1);
+                        }
+
+                        //TODO: Will assume packets all have the same length.  Change this later
+                        //Check packet lengths match
+                        txIndex += sendData(txPipe, 
+                                            txPacket_ch0, 
+                                            txModMode_ch0, 
+                                            txPacket_ch1, 
+                                            txModMode_ch1, 
+                                            txPacket_ch2, 
+                                            txModMode_ch2, 
+                                            txPacket_ch3, 
+                                            txModMode_ch3, 
+                                            txPacketLen_ch0, 
+                                            gain, 
+                                            maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
+                                            &txTokens);
                     }else{
                         //Write 0's
                         //TODO: Change to a more optimized solution
-                        sendData(txPipe, txPacket, txModMode, 0, gain, maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens , &txTokens);
+                        sendData(txPipe, 
+                                txPacket_ch0, 
+                                txModMode_ch0, 
+                                txPacket_ch1, 
+                                txModMode_ch1, 
+                                txPacket_ch2, 
+                                txModMode_ch2, 
+                                txPacket_ch3, 
+                                txModMode_ch3, 
+                                0, 
+                                gain, 
+                                maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
+                                &txTokens);
                     }
                 }
             }
@@ -188,8 +293,14 @@ void* mainThread(void* argsUncast){
 
     if(txPipe != NULL){
         //Cleanup
-        free(txPacket);
-        free(txModMode);
+        free(txPacket_ch0);
+        free(txModMode_ch0);
+        free(txPacket_ch1);
+        free(txModMode_ch1);
+        free(txPacket_ch2);
+        free(txModMode_ch2);
+        free(txPacket_ch3);
+        free(txModMode_ch3);
     }
 
     return NULL;
