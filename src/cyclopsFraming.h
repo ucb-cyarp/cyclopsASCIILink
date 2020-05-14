@@ -20,7 +20,8 @@
 //#define BITS_PER_SYMBOL_PREAMBLE (1)
 #define BITS_PER_SYMBOL_HEADER (1)
 
-#define TX_REPITIONS_PER_SYMBOL (4)
+#define TX_REPITIONS_PER_SYMBOL (4*2)
+#define RX_REPITITIONS_PER_OUTPUT (2)
 
 #define MOD_TYPE_BPSK (0)
 #define MOD_TYPE_QPSK (1)
@@ -107,7 +108,8 @@ int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
 //Note: We can read directly from the packed data stream once filtering for valid and strobe andf repacking
 //Sanitized for printable characters
 //Returns the number of filtered elements
-int filterRepackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_STROBE_DATATYPE* rawStrobe, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits);
+//PhaseCounter should be set to 0 in the initial call
+int filterRepackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_STROBE_DATATYPE* rawStrobe, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits, int *phaseCounter);
 
 int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulationBuf, uint64_t val, uint8_t bitsPerVal, uint8_t bitsPerSymbol, uint8_t symbolRepitions);
 

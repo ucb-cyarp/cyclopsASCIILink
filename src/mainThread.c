@@ -89,10 +89,12 @@ void* mainThread(void* argsUncast){
     RX_PACKED_LAST_DATATYPE remainingLast = false;
     int remainingBits = 0;
     int rxCount = 0;
+    int phaseCounter = 0;
 
     //Main Loop
     bool running = true;
     while(running){
+        //==== Tx ====
         if(txPipe!=NULL){
             //If transmissions are OK
             if(txTokens > 0) {
@@ -147,6 +149,7 @@ void* mainThread(void* argsUncast){
             }
         }
 
+        //==== Rx ====
         if(rxPipe!=NULL){
             //Read and print
             RX_PACKED_DATATYPE rxPackedData[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
@@ -174,7 +177,7 @@ void* mainThread(void* argsUncast){
 
             RX_PACKED_DATATYPE rxPackedDataFiltered[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_PACKED_LAST_DATATYPE rxPackedLastFiltered[RX_BLOCK_SIZE*maxBlocksToProcess];
-            int filteredElements  = filterRepackRxData(rxPackedDataFiltered, rxPackedLastFiltered, rxPackedData, rxPackedLast, rxPackedStrobe, rxPackedValid, rawElementsRead, &remainingPacked, &remainingLast, &remainingBits);
+            int filteredElements  = filterRepackRxData(rxPackedDataFiltered, rxPackedLastFiltered, rxPackedData, rxPackedLast, rxPackedStrobe, rxPackedValid, rawElementsRead, &remainingPacked, &remainingLast, &remainingBits, &phaseCounter);
             // if(filteredElements>0){
             //     printf("Number Filtered Elements: %d\n", filteredElements);
             // }

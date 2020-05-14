@@ -43,16 +43,49 @@ int sendData(FILE* pipe, const TX_SYMBOL_DATATYPE* txPacket, const TX_MODTYPE_DA
         #if TX_BLOCK_SIZE == 1
             if(txCursor<maxLenAvail) {
                 //NOTE, for BLOCK_SIZE of 1, the structure does not contain arrays
-                txStruct[blockInd].TX_SYMBOL_MEMBER_NAME = txPacket[txCursor];
-                txStruct[blockInd].TX_MODTYPE_MEMBER_NAME = txModMode[txCursor];
-                txStruct[blockInd].TX_GAIN_MEMBER_NAME = gain;
-                txStruct[blockInd].TX_ZERO_MEMBER_NAME = TX_ZERO_VALID_DATA;
+                //Ch0
+                txStruct[blockInd].TX_SYMBOL_CH0_MEMBER_NAME = txPacket[txCursor];
+                txStruct[blockInd].TX_MODTYPE_CH0_MEMBER_NAME = txModMode[txCursor];
+                txStruct[blockInd].TX_GAIN_CH0_MEMBER_NAME = gain;
+                txStruct[blockInd].TX_ZERO_CH0_MEMBER_NAME = TX_ZERO_VALID_DATA;
+                //Ch1 TODO: Change
+                txStruct[blockInd].TX_SYMBOL_CH1_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH1_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH1_MEMBER_NAME = gain;
+                txStruct[blockInd].TX_ZERO_CH1_MEMBER_NAME = TX_ZERO_BLANK_DATA;
+                //Ch2 TODO: Change
+                txStruct[blockInd].TX_SYMBOL_CH2_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH2_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH2_MEMBER_NAME = gain;
+                txStruct[blockInd].TX_ZERO_CH2_MEMBER_NAME = TX_ZERO_BLANK_DATA;
+                //Ch3 TODO: Change
+                txStruct[blockInd].TX_SYMBOL_CH3_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH3_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH3_MEMBER_NAME = gain;
+                txStruct[blockInd].TX_ZERO_CH3_MEMBER_NAME = TX_ZERO_BLANK_DATA;
+
                 txCursor++;
             }else{
-                txStruct[blockInd].TX_SYMBOL_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
-                txStruct[blockInd].TX_MODTYPE_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
-                txStruct[blockInd].TX_GAIN_MEMBER_NAME = gain;
-                txStruct[blockInd].TX_ZERO_MEMBER_NAME = TX_ZERO_BLANK_DATA;
+                //Ch0
+                txStruct[blockInd].TX_SYMBOL_CH0_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH0_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH0_MEMBER_NAME = gain;
+                txStruct[blockInd].TX_ZERO_CH0_MEMBER_NAME = TX_ZERO_BLANK_DATA;
+                //Ch1
+                txStruct[blockInd].TX_SYMBOL_CH1_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH1_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH1_MEMBER_NAME = gain;
+                txStruct[blockInd].TX_ZERO_CH1_MEMBER_NAME = TX_ZERO_BLANK_DATA;
+                //Ch2
+                txStruct[blockInd].TX_SYMBOL_CH2_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH2_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH2_MEMBER_NAME = gain;
+                txStruct[blockInd].TX_ZERO_CH2_MEMBER_NAME = TX_ZERO_BLANK_DATA;
+                //Ch3
+                txStruct[blockInd].TX_SYMBOL_CH3_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH3_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH3_MEMBER_NAME = gain;
+                txStruct[blockInd].TX_ZERO_CH3_MEMBER_NAME = TX_ZERO_BLANK_DATA;
             }
             blockInd++;
         #else
@@ -63,18 +96,50 @@ int sendData(FILE* pipe, const TX_SYMBOL_DATATYPE* txPacket, const TX_MODTYPE_DA
 
             //Fill up valid data
             for(int i = 0; i<len; i++){
-                txStruct[blockInd].TX_SYMBOL_MEMBER_NAME[i] = txPacket[txCursor+i];
-                txStruct[blockInd].TX_MODTYPE_MEMBER_NAME[i] = txModMode[txCursor+i];
-                txStruct[blockInd].TX_GAIN_MEMBER_NAME[i] = gain;
-                txStruct[blockInd].TX_ZERO_MEMBER_NAME [i]= TX_ZERO_VALID_DATA;
+                //Ch0
+                txStruct[blockInd].TX_SYMBOL_CH0_MEMBER_NAME[i] = txPacket[txCursor+i];
+                txStruct[blockInd].TX_MODTYPE_CH0_MEMBER_NAME[i] = txModMode[txCursor+i];
+                txStruct[blockInd].TX_GAIN_CH0_MEMBER_NAME[i] = gain;
+                txStruct[blockInd].TX_ZERO_CH0_MEMBER_NAME [i]= TX_ZERO_VALID_DATA;
+                //Ch1 TODO: Change
+                txStruct[blockInd].TX_SYMBOL_CH1_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH1_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH1_MEMBER_NAME[i] = gain;
+                txStruct[blockInd].TX_ZERO_CH1_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+                //Ch2 TODO: Change
+                txStruct[blockInd].TX_SYMBOL_CH2_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH2_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH2_MEMBER_NAME[i] = gain;
+                txStruct[blockInd].TX_ZERO_CH2_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+                //Ch3 TODO: Change
+                txStruct[blockInd].TX_SYMBOL_CH3_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH3_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH3_MEMBER_NAME[i] = gain;
+                txStruct[blockInd].TX_ZERO_CH3_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
             }
 
             //Fill up the tail (if necessary)
             for(int i = len; i<TX_BLOCK_SIZE; i++){
-                txStruct[blockInd].TX_SYMBOL_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
-                txStruct[blockInd].TX_MODTYPE_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
-                txStruct[blockInd].TX_GAIN_MEMBER_NAME[i] = gain;
-                txStruct[blockInd].TX_ZERO_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+                //Ch0
+                txStruct[blockInd].TX_SYMBOL_CH0_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH0_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH0_MEMBER_NAME[i] = gain;
+                txStruct[blockInd].TX_ZERO_CH0_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+                //Ch1
+                txStruct[blockInd].TX_SYMBOL_CH1_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH1_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH1_MEMBER_NAME[i] = gain;
+                txStruct[blockInd].TX_ZERO_CH1_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+                //Ch2
+                txStruct[blockInd].TX_SYMBOL_CH2_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH2_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH2_MEMBER_NAME[i] = gain;
+                txStruct[blockInd].TX_ZERO_CH2_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+                //Ch3
+                txStruct[blockInd].TX_SYMBOL_CH3_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+                txStruct[blockInd].TX_MODTYPE_CH3_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+                txStruct[blockInd].TX_GAIN_CH3_MEMBER_NAME[i] = gain;
+                txStruct[blockInd].TX_ZERO_CH3_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
             }
 
             blockInd++;
