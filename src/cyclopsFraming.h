@@ -31,9 +31,9 @@
 #define PADDING_BYTE_QPSK ('3')
 #define PADDING_BYTE_QAM16 ('(')
 
-#define BPSK_PAYLOAD_LEN_BYTES (1532)
-#define QPSK_PAYLOAD_LEN_BYTES (3064)
-#define QAM16_PAYLOAD_LEN_BYTES (6128)
+#define BPSK_PAYLOAD_LEN_BYTES (1528)
+#define QPSK_PAYLOAD_LEN_BYTES (3060)
+#define QAM16_PAYLOAD_LEN_BYTES (6124)
 
 extern const uint8_t cyclopsPreambleSymbols[];
 

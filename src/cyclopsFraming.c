@@ -507,7 +507,7 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                 int maxByteInd = (lastInd+1)*bytesPerPacked;
                 int byteLen = maxByteInd-packedByteInd;
                 if(byteInPacketLocal+byteLen != HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8+(*length)+CRC_BYTES_LEN){
-                    printf("Unexpected Position of Last Flag\n");
+                    printf("Unexpected Position of Last Flag: got %d, expected %d\n", byteInPacketLocal+byteLen, HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8+(*length)+CRC_BYTES_LEN);
                 }
 
                 byteInPacketLocal = 0;
