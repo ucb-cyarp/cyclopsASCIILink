@@ -27,6 +27,27 @@ int sendData(FILE* pipe,
              int *tokens);
 
 //Returns the number of elements (not blocks) read
-int recvData(FILE* pipe, RX_PACKED_DATATYPE* rxPackedData, RX_STROBE_DATATYPE* rxPackedStrobe, RX_PACKED_VALID_DATATYPE* rxPackedValid, RX_PACKED_LAST_DATATYPE* rxPackedLast, int maxBlocks, bool* doneReading);
+int recvData(FILE* pipe, 
+             //Ch0
+             RX_PACKED_DATATYPE* rxPackedData_ch0, 
+             RX_STROBE_DATATYPE* rxPackedStrobe_ch0, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch0, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch0, 
+             //Ch1
+             RX_PACKED_DATATYPE* rxPackedData_ch1, 
+             RX_STROBE_DATATYPE* rxPackedStrobe_ch1, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch1, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch1, 
+             //Ch2
+             RX_PACKED_DATATYPE* rxPackedData_ch2, 
+             RX_STROBE_DATATYPE* rxPackedStrobe_ch2, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch2, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch2, 
+             //Ch3
+             RX_PACKED_DATATYPE* rxPackedData_ch3, 
+             RX_STROBE_DATATYPE* rxPackedStrobe_ch3, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch3, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch3, 
+             int maxBlocks, bool* doneReading);
 
 #endif //CYCLOPSASCIILINK_HELPERS_H

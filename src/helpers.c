@@ -181,7 +181,28 @@ int sendData(FILE* pipe,
     return txCursor;
 }
 
-int recvData(FILE* pipe, RX_PACKED_DATATYPE* rxPackedData, RX_STROBE_DATATYPE* rxPackedStrobe, RX_PACKED_VALID_DATATYPE* rxPackedValid, RX_PACKED_LAST_DATATYPE* rxPackedLast, int maxBlocks, bool* doneReading){
+int recvData(FILE* pipe, 
+             //Ch0
+             RX_PACKED_DATATYPE* rxPackedData_ch0, 
+             RX_STROBE_DATATYPE* rxPackedStrobe_ch0, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch0, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch0, 
+             //Ch1
+             RX_PACKED_DATATYPE* rxPackedData_ch1, 
+             RX_STROBE_DATATYPE* rxPackedStrobe_ch1, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch1, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch1, 
+             //Ch2
+             RX_PACKED_DATATYPE* rxPackedData_ch2, 
+             RX_STROBE_DATATYPE* rxPackedStrobe_ch2, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch2, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch2, 
+             //Ch3
+             RX_PACKED_DATATYPE* rxPackedData_ch3, 
+             RX_STROBE_DATATYPE* rxPackedStrobe_ch3, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch3, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch3, 
+             int maxBlocks, bool* doneReading){
     int ind = 0;
     for(int i = 0; i<maxBlocks; i++) {
         //Check for input (use select)
@@ -203,15 +224,48 @@ int recvData(FILE* pipe, RX_PACKED_DATATYPE* rxPackedData, RX_STROBE_DATATYPE* r
             }
 
             #if RX_BLOCK_SIZE == 1
-                rxPackedData[ind] = rx.RX_PACKED_MEMBER_NAME;
-                rxPackedStrobe[ind] = rx.RX_STROBE_MEMBER_NAME;
-                rxPackedValid[ind] = rx.RX_VALID_MEMBER_NAME;
-                rxPackedLast[ind] = rx.RX_LAST_MEMBER_NAME;
+                //Ch0
+                rxPackedData_ch0[ind] = rx.RX_PACKED_CH0_MEMBER_NAME;
+                rxPackedStrobe_ch0[ind] = rx.RX_STROBE_CH0_MEMBER_NAME;
+                rxPackedValid_ch0[ind] = rx.RX_VALID_CH0_MEMBER_NAME;
+                rxPackedLast_ch0[ind] = rx.RX_LAST_CH0_MEMBER_NAME;
+                //Ch1
+                rxPackedData_ch1[ind] = rx.RX_PACKED_CH1_MEMBER_NAME;
+                rxPackedStrobe_ch1[ind] = rx.RX_STROBE_CH1_MEMBER_NAME;
+                rxPackedValid_ch1[ind] = rx.RX_VALID_CH1_MEMBER_NAME;
+                rxPackedLast_ch1[ind] = rx.RX_LAST_CH1_MEMBER_NAME;
+                //Ch2
+                rxPackedData_ch2[ind] = rx.RX_PACKED_CH2_MEMBER_NAME;
+                rxPackedStrobe_ch2[ind] = rx.RX_STROBE_CH2_MEMBER_NAME;
+                rxPackedValid_ch2[ind] = rx.RX_VALID_CH2_MEMBER_NAME;
+                rxPackedLast_ch2[ind] = rx.RX_LAST_CH2_MEMBER_NAME;
+                //Ch3
+                rxPackedData_ch3[ind] = rx.RX_PACKED_CH3_MEMBER_NAME;
+                rxPackedStrobe_ch3[ind] = rx.RX_STROBE_CH3_MEMBER_NAME;
+                rxPackedValid_ch3[ind] = rx.RX_VALID_CH3_MEMBER_NAME;
+                rxPackedLast_ch3[ind] = rx.RX_LAST_CH3_MEMBER_NAME;
             #else
-                memcpy(rxPackedData+ind, rx.RX_PACKED_MEMBER_NAME, sizeof(RX_PACKED_DATATYPE)*RX_BLOCK_SIZE);
-                memcpy(rxPackedStrobe+ind, rx.RX_STROBE_MEMBER_NAME, sizeof(RX_STROBE_DATATYPE)*RX_BLOCK_SIZE);
-                memcpy(rxPackedValid+ind, rx.RX_VALID_MEMBER_NAME, sizeof(RX_PACKED_VALID_DATATYPE)*RX_BLOCK_SIZE);
-                memcpy(rxPackedLast+ind, rx.RX_LAST_MEMBER_NAME, sizeof(RX_PACKED_LAST_DATATYPE)*RX_BLOCK_SIZE);
+                //Ch0
+                memcpy(rxPackedData_ch0+ind, rx.RX_PACKED_CH0_MEMBER_NAME, sizeof(RX_PACKED_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedStrobe_ch0+ind, rx.RX_STROBE_CH0_MEMBER_NAME, sizeof(RX_STROBE_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedValid_ch0+ind, rx.RX_VALID_CH0_MEMBER_NAME, sizeof(RX_PACKED_VALID_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedLast_ch0+ind, rx.RX_LAST_CH0_MEMBER_NAME, sizeof(RX_PACKED_LAST_DATATYPE)*RX_BLOCK_SIZE);
+                //Ch1
+                memcpy(rxPackedData_ch1+ind, rx.RX_PACKED_CH1_MEMBER_NAME, sizeof(RX_PACKED_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedStrobe_ch1+ind, rx.RX_STROBE_CH1_MEMBER_NAME, sizeof(RX_STROBE_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedValid_ch1+ind, rx.RX_VALID_CH1_MEMBER_NAME, sizeof(RX_PACKED_VALID_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedLast_ch1+ind, rx.RX_LAST_CH1_MEMBER_NAME, sizeof(RX_PACKED_LAST_DATATYPE)*RX_BLOCK_SIZE);
+                //Ch2
+                memcpy(rxPackedData_ch2+ind, rx.RX_PACKED_CH2_MEMBER_NAME, sizeof(RX_PACKED_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedStrobe_ch2+ind, rx.RX_STROBE_CH2_MEMBER_NAME, sizeof(RX_STROBE_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedValid_ch2+ind, rx.RX_VALID_CH2_MEMBER_NAME, sizeof(RX_PACKED_VALID_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedLast_ch2+ind, rx.RX_LAST_CH2_MEMBER_NAME, sizeof(RX_PACKED_LAST_DATATYPE)*RX_BLOCK_SIZE);
+                //Ch3
+                memcpy(rxPackedData_ch3+ind, rx.RX_PACKED_CH3_MEMBER_NAME, sizeof(RX_PACKED_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedStrobe_ch3+ind, rx.RX_STROBE_CH3_MEMBER_NAME, sizeof(RX_STROBE_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedValid_ch3+ind, rx.RX_VALID_CH3_MEMBER_NAME, sizeof(RX_PACKED_VALID_DATATYPE)*RX_BLOCK_SIZE);
+                memcpy(rxPackedLast_ch3+ind, rx.RX_LAST_CH3_MEMBER_NAME, sizeof(RX_PACKED_LAST_DATATYPE)*RX_BLOCK_SIZE);
+                
             #endif
             ind+=RX_BLOCK_SIZE;
         }else{

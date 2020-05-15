@@ -69,16 +69,33 @@
 #define RX_BLOCK_SIZE RX_DEMO_BLOCK_SIZE
 #define RX_STRUCTURE_TYPE_NAME rx_demo_outputs_bundle_2_t
 
-#define RX_PACKED_MEMBER_NAME packed_symbol_ch0_BUNDLE_2_outPort2_re
 #define RX_PACKED_DATATYPE uint8_t
-
-#define RX_STROBE_MEMBER_NAME strobe_ch0_BUNDLE_2_outPort0_re
 #define RX_STROBE_DATATYPE BOOL_TYPE
-
-#define RX_VALID_MEMBER_NAME packed_valid_ch0_BUNDLE_2_outPort1_re
 #define RX_PACKED_VALID_DATATYPE BOOL_TYPE
-
-#define RX_LAST_MEMBER_NAME packed_last_ch0_BUNDLE_2_outPort3_re
 #define RX_PACKED_LAST_DATATYPE BOOL_TYPE
+
+//Ch0
+#define RX_PACKED_CH0_MEMBER_NAME packed_symbol_ch0_BUNDLE_2_outPort2_re
+#define RX_STROBE_CH0_MEMBER_NAME strobe_ch0_BUNDLE_2_outPort0_re
+#define RX_VALID_CH0_MEMBER_NAME packed_valid_ch0_BUNDLE_2_outPort1_re
+#define RX_LAST_CH0_MEMBER_NAME packed_last_ch0_BUNDLE_2_outPort3_re
+
+//Ch1
+#define RX_PACKED_CH1_MEMBER_NAME packed_symbol_ch1_BUNDLE_2_outPort7_re
+#define RX_STROBE_CH1_MEMBER_NAME strobe_ch1_BUNDLE_2_outPort5_re
+#define RX_VALID_CH1_MEMBER_NAME packed_valid_ch1_BUNDLE_2_outPort6_re
+#define RX_LAST_CH1_MEMBER_NAME packed_last_ch1_BUNDLE_2_outPort8_re
+
+//Ch2
+#define RX_PACKED_CH2_MEMBER_NAME packed_symbol_ch2_BUNDLE_2_outPort12_re
+#define RX_STROBE_CH2_MEMBER_NAME strobe_ch2_BUNDLE_2_outPort10_re
+#define RX_VALID_CH2_MEMBER_NAME packed_valid_ch2_BUNDLE_2_outPort11_re
+#define RX_LAST_CH2_MEMBER_NAME packed_last_ch2_BUNDLE_2_outPort13_re
+
+//Ch3
+#define RX_PACKED_CH3_MEMBER_NAME packed_symbol_ch3_BUNDLE_2_outPort17_re
+#define RX_STROBE_CH3_MEMBER_NAME strobe_ch3_BUNDLE_2_outPort15_re
+#define RX_VALID_CH3_MEMBER_NAME packed_valid_ch3_BUNDLE_2_outPort16_re
+#define RX_LAST_CH3_MEMBER_NAME packed_last_ch3_BUNDLE_2_outPort18_re
 
 #endif //CYCLOPSASCIILINK_VITISSTRUCTURE_H

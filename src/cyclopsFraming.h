@@ -35,7 +35,71 @@
 #define QPSK_PAYLOAD_LEN_BYTES (3060)
 #define QAM16_PAYLOAD_LEN_BYTES (6124)
 
+#define MAX_PAYLOAD_LEN QAM16_PAYLOAD_LEN_BYTES
+#define MAX_PAYLOAD_PLUS_CRC_LEN (QAM16_PAYLOAD_LEN_BYTES+CRC_BYTES_LEN)
+
+//Colors (based on https://www.linuxjournal.com/article/8603, and https://en.wikipedia.org/wiki/Escape_sequences_in_C), and https://en.wikipedia.org/wiki/ANSI_escape_code
+#define RESET (0)
+#define BRIGHT (1)
+#define DIM (2)
+#define UNDERLINE (3)
+#define BLINK (4)
+#define REVERSE (5)
+#define HIDDEN (6)
+
+#define BLACK (0)
+#define RED	(1)
+#define GREEN (2)
+#define YELLOW (3)
+#define BLUE (4)
+#define MAGENTA	(5)
+#define CYAN (6)
+#define	WHITE (7)
+#define BRIGHT_BLACK (60)
+#define BRIGHT_RED (61)
+#define BRIGHT_GREEN (62)
+#define BRIGHT_YELLOW (63)
+#define BRIGHT_BLUE (64)
+#define BRIGHT_MAGENTA (65)
+#define BRIGHT_CYAN (66)
+#define BRIGHT_WHITE (67)
+
+#define BG_COLOR BRIGHT_WHITE
+#define FG_COLOR_DEFAULT BLACK
+#define FG_COLOR_START RED
+
+void setColor(int fg_color, int bg_color, int mode);
+
 extern const uint8_t cyclopsPreambleSymbols[];
+
+typedef struct{
+    //TODO: move to a more conservative data storage scheme
+    int dataLen; //The number of bytes in the packet
+    int id; //The packet sequence ID
+    uint8_t modMode; //The modulation type of this packet
+    uint8_t packetType; //The type of packet
+    int rxCount; //The reception number of this packet
+    char data[MAX_PAYLOAD_PLUS_CRC_LEN]; //A byte array to store the packet.  This is sized for the max size packet
+} rx_packet_t; //This is used for Rx packets
+
+typedef struct{
+    int byteInPacket;
+    uint8_t modMode;
+    uint8_t type;
+    uint8_t src;
+    uint8_t dst;
+    int16_t netID;
+    int16_t length;
+    int rxCount;
+    rx_packet_t* currentPacket;
+} rx_decoder_state_t;
+
+typedef struct{
+    rx_packet_t* packetBuffer;
+    int packetBufferSize;
+    int packetBufferOccupancy;
+    int packetBufferReadInd;
+} packet_buffer_state_t;
 
 //This includes each symbol being repeated 4 times.  Each symbol is placed in a unit of MAX_BITS_PER_SYMBOL bits
 int createRawPreamble(TX_SYMBOL_DATATYPE *rawPreambleBuf, TX_MODTYPE_DATATYPE *preambleModulationBuf);
@@ -115,5 +179,11 @@ int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulati
 
 //The latter pointers are used to carry state between calls in case the header is in the middle of being parsed between 2 calls to the function.  Byte in packet is used to track if the
 void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, int* byteInPacket, uint8_t* modMode, uint8_t* type, uint8_t* src, uint8_t* dst, int16_t *netID, int16_t *length, bool printDetails, int* rxCount);
+
+void parsePacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, rx_decoder_state_t *decoderState, packet_buffer_state_t* packetBufferState);
+
+void printPacketStruct(rx_packet_t* packet, int ch, bool printTitle, bool printDetails, bool printContent);
+
+void processPackets(packet_buffer_state_t** buffers, int numBuffers, int* currentID, int maxID, int *currentBuffer, int *failureCount, int maxFailures, bool printTitle, bool printDetails, bool printContent);
 
 #endif //CYCLOPSASCIILINK_CYCLOPSFRAMING_H
