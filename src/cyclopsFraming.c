@@ -623,7 +623,7 @@ void parsePacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
             }
             byteInPacketLocal++;
             packedByteInd++;
-        }else if(byteInPacketLocal < decoderState->length){
+        }else if(byteInPacketLocal < decoderState->length + HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8){
             //TODO: Relies on header being a multiple of the packed length
 
             int packedInd = packedByteInd/bytesPerPacked;

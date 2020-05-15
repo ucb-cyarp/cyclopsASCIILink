@@ -15,8 +15,8 @@
 #define RX_PACKETS_TO_STORE_PER_CH (5)
 #define RX_MAX_FAILURES (10)
 
-#define PRINT_RX_TITLE (false)
-#define PRINT_RX_DETAILS (false)
+#define PRINT_RX_TITLE (true)
+#define PRINT_RX_DETAILS (true)
 #define PRINT_RX_CONTENT (true)
 
 void* mainThread(void* argsUncast){
