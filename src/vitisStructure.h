@@ -24,7 +24,7 @@
 #define TX_STRUCTURE_TYPE_NAME tx_demo_inputs_bundle_1_t
 
 //Tx BlockSize
-#define TX_BLOCK_SIZE TX_DEMO_BLOCK_SIZE
+#define TX_BLOCK_SIZE TX_DEMO_INPUT_BUNDLE1_BLOCKSIZE
 //Tx Symbol
 #define TX_SYMBOL_DATATYPE uint8_t
 #define TX_SYMBOL_BLANK_VAL 0
@@ -66,7 +66,7 @@
 #define RX_AVAILABLE true
 #define RX_PACKED_BITS 4 //There are 4 bits per packed
 
-#define RX_BLOCK_SIZE RX_DEMO_BLOCK_SIZE
+#define RX_BLOCK_SIZE RX_DEMO_OUTPUT_BUNDLE2_BLOCKSIZE
 #define RX_STRUCTURE_TYPE_NAME rx_demo_outputs_bundle_2_t
 
 #define RX_PACKED_DATATYPE uint8_t
