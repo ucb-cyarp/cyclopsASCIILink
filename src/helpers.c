@@ -33,6 +33,7 @@ bool isReadyForReading(FILE* file){
 }
 
 //We assume each channel has packets of the same length
+#ifdef MULTI_CH
 int sendData(FILE* pipe, 
              //Ch0
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
@@ -50,6 +51,16 @@ int sendData(FILE* pipe,
              TX_GAIN_DATATYPE gain, 
              int maxTokens, 
              int *tokens){
+#else
+int sendData(FILE* pipe, 
+             //Ch0
+             const TX_SYMBOL_DATATYPE* txPacket_ch0, 
+             const TX_MODTYPE_DATATYPE* txModMode_ch0, 
+             int maxLenAvail, 
+             int maxTokens, 
+             int *tokens){
+#endif
+
     TX_STRUCTURE_TYPE_NAME txStruct[maxTokens];
 
     int txCursor = 0;
@@ -63,9 +74,9 @@ int sendData(FILE* pipe,
                 //Ch0
                 txStruct[blockInd].TX_SYMBOL_CH0_MEMBER_NAME = txPacket_ch0[txCursor];
                 txStruct[blockInd].TX_MODTYPE_CH0_MEMBER_NAME = txModMode_ch0[txCursor];
-                txStruct[blockInd].TX_GAIN_CH0_MEMBER_NAME = gain;
-                txStruct[blockInd].TX_ZERO_CH0_MEMBER_NAME = TX_ZERO_VALID_DATA;
+                txStruct[blockInd].TX_EN_CH0_MEMBER_NAME = TX_EN_VALID_DATA;
                 //Ch1
+                #ifdef MULTI_CH
                 txStruct[blockInd].TX_SYMBOL_CH1_MEMBER_NAME = txPacket_ch1[txCursor];
                 txStruct[blockInd].TX_MODTYPE_CH1_MEMBER_NAME = txModMode_ch1[txCursor];
                 txStruct[blockInd].TX_GAIN_CH1_MEMBER_NAME = gain;
@@ -80,14 +91,14 @@ int sendData(FILE* pipe,
                 txStruct[blockInd].TX_MODTYPE_CH3_MEMBER_NAME = txModMode_ch3[txCursor];
                 txStruct[blockInd].TX_GAIN_CH3_MEMBER_NAME = gain;
                 txStruct[blockInd].TX_ZERO_CH3_MEMBER_NAME = TX_ZERO_VALID_DATA;
-
+                #endif
                 txCursor++;
             }else{
                 //Ch0
                 txStruct[blockInd].TX_SYMBOL_CH0_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
                 txStruct[blockInd].TX_MODTYPE_CH0_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
-                txStruct[blockInd].TX_GAIN_CH0_MEMBER_NAME = gain;
-                txStruct[blockInd].TX_ZERO_CH0_MEMBER_NAME = TX_ZERO_BLANK_DATA;
+                txStruct[blockInd].TX_ZERO_CH0_MEMBER_NAME = TX_EN_BLANK_DATA;
+                #ifdef MULTI_CH
                 //Ch1
                 txStruct[blockInd].TX_SYMBOL_CH1_MEMBER_NAME = TX_SYMBOL_BLANK_VAL;
                 txStruct[blockInd].TX_MODTYPE_CH1_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
@@ -103,6 +114,7 @@ int sendData(FILE* pipe,
                 txStruct[blockInd].TX_MODTYPE_CH3_MEMBER_NAME = TX_MODTYPE_BLANK_VAL;
                 txStruct[blockInd].TX_GAIN_CH3_MEMBER_NAME = gain;
                 txStruct[blockInd].TX_ZERO_CH3_MEMBER_NAME = TX_ZERO_BLANK_DATA;
+                #endif
             }
             blockInd++;
         #else
@@ -116,8 +128,8 @@ int sendData(FILE* pipe,
                 //Ch0
                 txStruct[blockInd].TX_SYMBOL_CH0_MEMBER_NAME[i] = txPacket_ch0[txCursor+i];
                 txStruct[blockInd].TX_MODTYPE_CH0_MEMBER_NAME[i] = txModMode_ch0[txCursor+i];
-                txStruct[blockInd].TX_GAIN_CH0_MEMBER_NAME[i] = gain;
-                txStruct[blockInd].TX_ZERO_CH0_MEMBER_NAME [i]= TX_ZERO_VALID_DATA;
+                txStruct[blockInd].TX_EN_CH0_MEMBER_NAME [i]= TX_EN_VALID_DATA;
+                #ifdef MULTI_CH
                 //Ch1
                 txStruct[blockInd].TX_SYMBOL_CH1_MEMBER_NAME[i] = txPacket_ch1[txCursor+i];
                 txStruct[blockInd].TX_MODTYPE_CH1_MEMBER_NAME[i] = txModMode_ch1[txCursor+i];
@@ -133,6 +145,7 @@ int sendData(FILE* pipe,
                 txStruct[blockInd].TX_MODTYPE_CH3_MEMBER_NAME[i] = txModMode_ch3[txCursor+i];
                 txStruct[blockInd].TX_GAIN_CH3_MEMBER_NAME[i] = gain;
                 txStruct[blockInd].TX_ZERO_CH3_MEMBER_NAME[i] = TX_ZERO_VALID_DATA;
+                #endif
             }
 
             //Fill up the tail (if necessary)
@@ -140,8 +153,8 @@ int sendData(FILE* pipe,
                 //Ch0
                 txStruct[blockInd].TX_SYMBOL_CH0_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
                 txStruct[blockInd].TX_MODTYPE_CH0_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
-                txStruct[blockInd].TX_GAIN_CH0_MEMBER_NAME[i] = gain;
-                txStruct[blockInd].TX_ZERO_CH0_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+                txStruct[blockInd].TX_EN_CH0_MEMBER_NAME[i] = TX_EN_BLANK_DATA;
+                #ifdef MULTI_CH
                 //Ch1
                 txStruct[blockInd].TX_SYMBOL_CH1_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
                 txStruct[blockInd].TX_MODTYPE_CH1_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
@@ -157,6 +170,7 @@ int sendData(FILE* pipe,
                 txStruct[blockInd].TX_MODTYPE_CH3_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
                 txStruct[blockInd].TX_GAIN_CH3_MEMBER_NAME[i] = gain;
                 txStruct[blockInd].TX_ZERO_CH3_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+                #endif
             }
 
             blockInd++;
@@ -181,6 +195,7 @@ int sendData(FILE* pipe,
     return txCursor;
 }
 
+#ifdef MULTI_CH
 int recvData(FILE* pipe, 
              //Ch0
              RX_PACKED_DATATYPE* rxPackedData_ch0, 
@@ -203,6 +218,15 @@ int recvData(FILE* pipe,
              RX_PACKED_VALID_DATATYPE* rxPackedValid_ch3, 
              RX_PACKED_LAST_DATATYPE* rxPackedLast_ch3, 
              int maxBlocks, bool* doneReading){
+#else
+int recvData(FILE* pipe, 
+             //Ch0
+             RX_PACKED_DATATYPE* rxPackedData_ch0, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch0, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch0, 
+             int maxBlocks, bool* doneReading){
+#endif
+
     int ind = 0;
     for(int i = 0; i<maxBlocks; i++) {
         //Check for input (use select)
@@ -226,9 +250,9 @@ int recvData(FILE* pipe,
             #if RX_BLOCK_SIZE == 1
                 //Ch0
                 rxPackedData_ch0[ind] = rx.RX_PACKED_CH0_MEMBER_NAME;
-                rxPackedStrobe_ch0[ind] = rx.RX_STROBE_CH0_MEMBER_NAME;
                 rxPackedValid_ch0[ind] = rx.RX_VALID_CH0_MEMBER_NAME;
                 rxPackedLast_ch0[ind] = rx.RX_LAST_CH0_MEMBER_NAME;
+                #ifdef MULTI_CH
                 //Ch1
                 rxPackedData_ch1[ind] = rx.RX_PACKED_CH1_MEMBER_NAME;
                 rxPackedStrobe_ch1[ind] = rx.RX_STROBE_CH1_MEMBER_NAME;
@@ -244,12 +268,13 @@ int recvData(FILE* pipe,
                 rxPackedStrobe_ch3[ind] = rx.RX_STROBE_CH3_MEMBER_NAME;
                 rxPackedValid_ch3[ind] = rx.RX_VALID_CH3_MEMBER_NAME;
                 rxPackedLast_ch3[ind] = rx.RX_LAST_CH3_MEMBER_NAME;
+                #endif
             #else
                 //Ch0
                 memcpy(rxPackedData_ch0+ind, rx.RX_PACKED_CH0_MEMBER_NAME, sizeof(RX_PACKED_DATATYPE)*RX_BLOCK_SIZE);
-                memcpy(rxPackedStrobe_ch0+ind, rx.RX_STROBE_CH0_MEMBER_NAME, sizeof(RX_STROBE_DATATYPE)*RX_BLOCK_SIZE);
                 memcpy(rxPackedValid_ch0+ind, rx.RX_VALID_CH0_MEMBER_NAME, sizeof(RX_PACKED_VALID_DATATYPE)*RX_BLOCK_SIZE);
                 memcpy(rxPackedLast_ch0+ind, rx.RX_LAST_CH0_MEMBER_NAME, sizeof(RX_PACKED_LAST_DATATYPE)*RX_BLOCK_SIZE);
+                #ifdef MULTI_CH
                 //Ch1
                 memcpy(rxPackedData_ch1+ind, rx.RX_PACKED_CH1_MEMBER_NAME, sizeof(RX_PACKED_DATATYPE)*RX_BLOCK_SIZE);
                 memcpy(rxPackedStrobe_ch1+ind, rx.RX_STROBE_CH1_MEMBER_NAME, sizeof(RX_STROBE_DATATYPE)*RX_BLOCK_SIZE);
@@ -265,7 +290,7 @@ int recvData(FILE* pipe,
                 memcpy(rxPackedStrobe_ch3+ind, rx.RX_STROBE_CH3_MEMBER_NAME, sizeof(RX_STROBE_DATATYPE)*RX_BLOCK_SIZE);
                 memcpy(rxPackedValid_ch3+ind, rx.RX_VALID_CH3_MEMBER_NAME, sizeof(RX_PACKED_VALID_DATATYPE)*RX_BLOCK_SIZE);
                 memcpy(rxPackedLast_ch3+ind, rx.RX_LAST_CH3_MEMBER_NAME, sizeof(RX_PACKED_LAST_DATATYPE)*RX_BLOCK_SIZE);
-                
+                #endif
             #endif
             ind+=RX_BLOCK_SIZE;
         }else{

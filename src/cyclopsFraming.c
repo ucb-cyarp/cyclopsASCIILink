@@ -328,6 +328,46 @@ int filterRepackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE
     return dstInd;
 }
 
+int repackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits, int *phaseCounter){
+    int dstInd = 0;
+
+    static_assert(sizeof(RX_PACKED_DATATYPE)*8 % RX_PACKED_BITS == 0, "RX_PACKED_DATATYPE must be a multiple of RX_PACKED_BITS"); //Simplfies computation for now
+    static_assert(sizeof(RX_PACKED_DATATYPE) == 1, "For now, restriciting RX_PACKED_DATATYPE to bytes for sanitization code"); //TODO: change
+
+    int currentBits = *remainingBits;
+    RX_PACKED_DATATYPE repackedLocal = *remainingPacked;
+    RX_PACKED_LAST_DATATYPE repackedLastLocal = *remainingLast;
+
+    int newShiftAmt = sizeof(RX_PACKED_DATATYPE)*8 - RX_PACKED_BITS;
+
+    for(int i = 0; i<rawLen; i++){
+        if(*phaseCounter == 0 && rawValid[i]){
+            repackedLocal = (rawPacked[i] << newShiftAmt)|(repackedLocal >> RX_PACKED_BITS);
+            repackedLastLocal = repackedLastLocal || rawPackedLast[i];
+            currentBits += RX_PACKED_BITS;
+            if(currentBits == sizeof(RX_PACKED_DATATYPE)*8){
+                //Complete, store
+                resultPacked[dstInd] = repackedLocal;
+                resultPackedLast[dstInd] = repackedLastLocal;
+                // printf("0b%d%d%d%d %d%d%d%d [%c] (%d)\n", (resultPacked[dstInd]>>7)&1, (resultPacked[dstInd]>>6)&1, (resultPacked[dstInd]>>5)&1, (resultPacked[dstInd]>>4)&1, (resultPacked[dstInd]>>3)&1, (resultPacked[dstInd]>>2)&1, (resultPacked[dstInd]>>1)&1, (resultPacked[dstInd])&1, resultPacked[dstInd], resultPackedLast[dstInd]);
+                dstInd++;
+
+                //Reset state
+                currentBits = 0;
+                repackedLocal = 0;
+                repackedLastLocal = false;
+            }
+        }
+        *phaseCounter = *phaseCounter < (RX_REPITITIONS_PER_OUTPUT-1) ? (*phaseCounter)+1 : 0;
+    }
+
+    *remainingBits = currentBits;
+    *remainingPacked = repackedLocal;
+    *remainingLast = repackedLastLocal;
+
+    return dstInd;
+}
+
 void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, int* byteInPacket, uint8_t* modMode, uint8_t* type, uint8_t* src, uint8_t *dst, int16_t *netID, int16_t *length, bool printDetails, int *rxCount){
     static_assert((HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8)%sizeof(*packedFiltered) == 0, "For now, header must be a multiple of the size of RX_PACKED_DATATYPE");
     static_assert(BPSK_PAYLOAD_LEN_BYTES%sizeof(*packedFiltered) == 0, "For now, BPSK packet length must be a multiple of the size of RX_PACKED_DATATYPE");

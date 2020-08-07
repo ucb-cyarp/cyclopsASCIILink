@@ -8,10 +8,12 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "cyclopsFraming.h"
+#include "vitisStructure.h"
 
 bool isReadyForReading(FILE* file);
 
 //Returns the number of elements (not blocks) written
+#ifdef MULTI_CH
 int sendData(FILE* pipe, 
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
              const TX_MODTYPE_DATATYPE* txModMode_ch0, 
@@ -25,8 +27,17 @@ int sendData(FILE* pipe,
              TX_GAIN_DATATYPE gain, 
              int maxTokens, 
              int *tokens);
+#else
+int sendData(FILE* pipe, 
+             const TX_SYMBOL_DATATYPE* txPacket_ch0, 
+             const TX_MODTYPE_DATATYPE* txModMode_ch0, 
+             int maxLenAvail, 
+             int maxTokens, 
+             int *tokens);
+#endif
 
 //Returns the number of elements (not blocks) read
+#ifdef MULTI_CH
 int recvData(FILE* pipe, 
              //Ch0
              RX_PACKED_DATATYPE* rxPackedData_ch0, 
@@ -49,5 +60,13 @@ int recvData(FILE* pipe,
              RX_PACKED_VALID_DATATYPE* rxPackedValid_ch3, 
              RX_PACKED_LAST_DATATYPE* rxPackedLast_ch3, 
              int maxBlocks, bool* doneReading);
+#else
+int recvData(FILE* pipe, 
+             //Ch0
+             RX_PACKED_DATATYPE* rxPackedData_ch0, 
+             RX_PACKED_VALID_DATATYPE* rxPackedValid_ch0, 
+             RX_PACKED_LAST_DATATYPE* rxPackedLast_ch0, 
+             int maxBlocks, bool* doneReading);
+#endif
 
 #endif //CYCLOPSASCIILINK_HELPERS_H

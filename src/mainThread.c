@@ -66,6 +66,7 @@ void* mainThread(void* argsUncast){
     TX_SYMBOL_DATATYPE* txPacket_ch0;
     TX_MODTYPE_DATATYPE* txModMode_ch0;
     int txPacketLen_ch0 = 0; //In terms of TX_SYMBOL_DATATYPE units
+    #ifdef MULTI_CH
     //Ch1
     TX_SYMBOL_DATATYPE* txPacket_ch1;
     TX_MODTYPE_DATATYPE* txModMode_ch1;
@@ -78,6 +79,7 @@ void* mainThread(void* argsUncast){
     TX_SYMBOL_DATATYPE* txPacket_ch3;
     TX_MODTYPE_DATATYPE* txModMode_ch3;
     int txPacketLen_ch3 = 0; //In terms of TX_SYMBOL_DATATYPE units
+    #endif
     
     int msgBytesRead = 0;
     uint8_t txSrc = 0;
@@ -92,19 +94,23 @@ void* mainThread(void* argsUncast){
     if(txPipe != NULL){
         txPacket_ch0 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txModMode_ch0 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        #ifdef MULTI_CH
         txPacket_ch1 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txModMode_ch1 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txPacket_ch2 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txModMode_ch2 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txPacket_ch3 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txModMode_ch3 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
+        #endif
 
         //Create a temporary packet to be used when sending a blank signal
         //TODO: Optimize this
         txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, 1, blankStr, &msgBytesRead);
+        #ifdef MULTI_CH
         txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, 1, blankStr, &msgBytesRead);
         txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, 1, blankStr, &msgBytesRead);
         txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, 1, blankStr, &msgBytesRead);
+        #endif
 
 //        txPacketLen_ch0 =  createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txSrc, txDst, txNetID, 4, testText, &msgBytesRead); //Encode a 16QAM Packet
 //        txPacketLen_ch0 =  createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txSrc, txDst, txNetID, 2, testText, &msgBytesRead); //Encode a QPSK Packet
@@ -120,28 +126,38 @@ void* mainThread(void* argsUncast){
 
     //Rx State
     rx_decoder_state_t rx_decoder_state_ch0 = {0, 0, 0, 0, 0, 0, 0, 0, NULL};
+    #ifdef MULTI_CH
     rx_decoder_state_t rx_decoder_state_ch1 = {0, 0, 0, 0, 0, 0, 0, 0, NULL};
     rx_decoder_state_t rx_decoder_state_ch2 = {0, 0, 0, 0, 0, 0, 0, 0, NULL};
     rx_decoder_state_t rx_decoder_state_ch3 = {0, 0, 0, 0, 0, 0, 0, 0, NULL};
+    #endif
 
     rx_packet_t rx_packet_buffer_ch0[RX_PACKETS_TO_STORE_PER_CH];
+    #ifdef MULTI_CH
     rx_packet_t rx_packet_buffer_ch1[RX_PACKETS_TO_STORE_PER_CH];
     rx_packet_t rx_packet_buffer_ch2[RX_PACKETS_TO_STORE_PER_CH];
     rx_packet_t rx_packet_buffer_ch3[RX_PACKETS_TO_STORE_PER_CH];
+    #endif
 
     packet_buffer_state_t rx_packet_buffer_state_ch0 = {rx_packet_buffer_ch0, RX_PACKETS_TO_STORE_PER_CH, 0, 0};
+    #ifdef MULTI_CH
     packet_buffer_state_t rx_packet_buffer_state_ch1 = {rx_packet_buffer_ch1, RX_PACKETS_TO_STORE_PER_CH, 0, 0};
     packet_buffer_state_t rx_packet_buffer_state_ch2 = {rx_packet_buffer_ch2, RX_PACKETS_TO_STORE_PER_CH, 0, 0};
     packet_buffer_state_t rx_packet_buffer_state_ch3 = {rx_packet_buffer_ch3, RX_PACKETS_TO_STORE_PER_CH, 0, 0};
+    #endif
 
     int currentID = 0;
     int currentBuffer = 0;
     int failureCount = 0;
 
+    #ifdef MULTI_CH
     packet_buffer_state_t*  rx_packet_buffer_states[] = {&rx_packet_buffer_state_ch0,
                                                          &rx_packet_buffer_state_ch1,
                                                          &rx_packet_buffer_state_ch2,
                                                          &rx_packet_buffer_state_ch3};
+    #else
+    packet_buffer_state_t*  rx_packet_buffer_states[] = {&rx_packet_buffer_state_ch0};
+    #endif
 
 
     //Ch0
@@ -149,6 +165,7 @@ void* mainThread(void* argsUncast){
     RX_PACKED_LAST_DATATYPE remainingLast_ch0 = false;
     int remainingBits_ch0 = 0;
     int phaseCounter_ch0 = 0;
+    #ifdef MULTI_CH
     //Ch1
     RX_PACKED_DATATYPE remainingPacked_ch1 = 0;
     RX_PACKED_LAST_DATATYPE remainingLast_ch1 = false;
@@ -164,6 +181,7 @@ void* mainThread(void* argsUncast){
     RX_PACKED_LAST_DATATYPE remainingLast_ch3 = false;
     int remainingBits_ch3 = 0;
     int phaseCounter_ch3 = 0;
+    #endif
 
     //Main Loop
     bool running = true;
@@ -178,6 +196,7 @@ void* mainThread(void* argsUncast){
                     //Check if we are currently sending a packet
                     //Send a packet
                     // printf("In process of sending packet\n");
+                    #ifdef MULTI_CH
                     txIndex += sendData(txPipe, 
                                             txPacket_ch0+txIndex, 
                                             txModMode_ch0+txIndex, 
@@ -191,6 +210,14 @@ void* mainThread(void* argsUncast){
                                             gain, 
                                             maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
                                             &txTokens);
+                    #else
+                    txIndex += sendData(txPipe, 
+                                            txPacket_ch0+txIndex, 
+                                            txModMode_ch0+txIndex, 
+                                            txPacketLen_ch0-txIndex, 
+                                            maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
+                                            &txTokens);
+                    #endif
                 }else{
                     //Should we be sending
                     time_t currentTime = time(NULL);
@@ -208,6 +235,8 @@ void* mainThread(void* argsUncast){
                             //Got to the end of the string, wrap around
                             txStrLoc = 0;
                         }
+
+                        #ifdef MULTI_CH
 
                         txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, 1, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
                         txStrLoc+=msgBytesRead;
@@ -237,9 +266,11 @@ void* mainThread(void* argsUncast){
                             printf("Encountered an error generating packets");
                             exit(1);
                         }
+                        #endif
 
                         //TODO: Will assume packets all have the same length.  Change this later
                         //Check packet lengths match
+                        #ifdef MULTI_CH
                         txIndex += sendData(txPipe, 
                                             txPacket_ch0, 
                                             txModMode_ch0, 
@@ -253,9 +284,18 @@ void* mainThread(void* argsUncast){
                                             gain, 
                                             maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
                                             &txTokens);
+                        #else
+                        txIndex += sendData(txPipe, 
+                                            txPacket_ch0, 
+                                            txModMode_ch0, 
+                                            txPacketLen_ch0, 
+                                            maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
+                                            &txTokens);
+                        #endif
                     }else{
                         //Write 0's
                         //TODO: Change to a more optimized solution
+                        #ifdef MULTI_CH
                         sendData(txPipe, 
                                 txPacket_ch0, 
                                 txModMode_ch0, 
@@ -269,6 +309,14 @@ void* mainThread(void* argsUncast){
                                 gain, 
                                 maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
                                 &txTokens);
+                        #else
+                        sendData(txPipe, 
+                                txPacket_ch0, 
+                                txModMode_ch0, 
+                                0, 
+                                maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
+                                &txTokens);
+                        #endif
                     }
                 }
             }
@@ -305,9 +353,9 @@ void* mainThread(void* argsUncast){
             //Read and print
             //Ch0
             RX_PACKED_DATATYPE rxPackedData_ch0[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
-            RX_STROBE_DATATYPE rxPackedStrobe_ch0[RX_BLOCK_SIZE*maxBlocksToProcess];
             RX_PACKED_VALID_DATATYPE rxPackedValid_ch0[RX_BLOCK_SIZE*maxBlocksToProcess];
             RX_PACKED_LAST_DATATYPE rxPackedLast_ch0[RX_BLOCK_SIZE*maxBlocksToProcess];
+            #ifdef MULTI_CH
             //Ch1
             RX_PACKED_DATATYPE rxPackedData_ch1[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_STROBE_DATATYPE rxPackedStrobe_ch1[RX_BLOCK_SIZE*maxBlocksToProcess];
@@ -323,8 +371,10 @@ void* mainThread(void* argsUncast){
             RX_STROBE_DATATYPE rxPackedStrobe_ch3[RX_BLOCK_SIZE*maxBlocksToProcess];
             RX_PACKED_VALID_DATATYPE rxPackedValid_ch3[RX_BLOCK_SIZE*maxBlocksToProcess];
             RX_PACKED_LAST_DATATYPE rxPackedLast_ch3[RX_BLOCK_SIZE*maxBlocksToProcess];
+            #endif
 
             bool isDoneReading = false;
+            #ifdef MULTI_CH
             int rawElementsRead = recvData(rxPipe,
                                            //Ch0 
                                            rxPackedData_ch0, 
@@ -347,6 +397,14 @@ void* mainThread(void* argsUncast){
                                            rxPackedValid_ch3, 
                                            rxPackedLast_ch3, 
                                            maxBlocksToProcess, &isDoneReading);
+            #else
+            int rawElementsRead = recvData(rxPipe,
+                                           //Ch0 
+                                           rxPackedData_ch0, 
+                                           rxPackedValid_ch0, 
+                                           rxPackedLast_ch0, 
+                                           maxBlocksToProcess, &isDoneReading);
+            #endif
 
             if(isDoneReading){
                 //done reading
@@ -377,11 +435,13 @@ void* mainThread(void* argsUncast){
             RX_PACKED_DATATYPE rxPackedDataFiltered_ch3[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch3[RX_BLOCK_SIZE*maxBlocksToProcess];
 
-            int filteredElements_ch0  = filterRepackRxData(rxPackedDataFiltered_ch0, rxPackedLastFiltered_ch0, rxPackedData_ch0, rxPackedLast_ch0, rxPackedStrobe_ch0, rxPackedValid_ch0, rawElementsRead, &remainingPacked_ch0, &remainingLast_ch0, &remainingBits_ch0, &phaseCounter_ch0);
-            int filteredElements_ch1  = filterRepackRxData(rxPackedDataFiltered_ch1, rxPackedLastFiltered_ch1, rxPackedData_ch1, rxPackedLast_ch1, rxPackedStrobe_ch1, rxPackedValid_ch1, rawElementsRead, &remainingPacked_ch1, &remainingLast_ch1, &remainingBits_ch1, &phaseCounter_ch1);
-            int filteredElements_ch2  = filterRepackRxData(rxPackedDataFiltered_ch2, rxPackedLastFiltered_ch2, rxPackedData_ch2, rxPackedLast_ch2, rxPackedStrobe_ch2, rxPackedValid_ch2, rawElementsRead, &remainingPacked_ch2, &remainingLast_ch2, &remainingBits_ch2, &phaseCounter_ch2);
-            int filteredElements_ch3  = filterRepackRxData(rxPackedDataFiltered_ch3, rxPackedLastFiltered_ch3, rxPackedData_ch3, rxPackedLast_ch3, rxPackedStrobe_ch3, rxPackedValid_ch3, rawElementsRead, &remainingPacked_ch3, &remainingLast_ch3, &remainingBits_ch3, &phaseCounter_ch3);
-            
+            int filteredElements_ch0  = repackRxData(rxPackedDataFiltered_ch0, rxPackedLastFiltered_ch0, rxPackedData_ch0, rxPackedLast_ch0, rxPackedValid_ch0, rawElementsRead, &remainingPacked_ch0, &remainingLast_ch0, &remainingBits_ch0, &phaseCounter_ch0);
+            #ifdef MULTI_CH
+            int filteredElements_ch1  = repackRxData(rxPackedDataFiltered_ch1, rxPackedLastFiltered_ch1, rxPackedData_ch1, rxPackedLast_ch1, rxPackedValid_ch1, rawElementsRead, &remainingPacked_ch1, &remainingLast_ch1, &remainingBits_ch1, &phaseCounter_ch1);
+            int filteredElements_ch2  = repackRxData(rxPackedDataFiltered_ch2, rxPackedLastFiltered_ch2, rxPackedData_ch2, rxPackedLast_ch2, rxPackedValid_ch2, rawElementsRead, &remainingPacked_ch2, &remainingLast_ch2, &remainingBits_ch2, &phaseCounter_ch2);
+            int filteredElements_ch3  = repackRxData(rxPackedDataFiltered_ch3, rxPackedLastFiltered_ch3, rxPackedData_ch3, rxPackedLast_ch3, rxPackedValid_ch3, rawElementsRead, &remainingPacked_ch3, &remainingLast_ch3, &remainingBits_ch3, &phaseCounter_ch3);
+            #endif
+
             // if(filteredElements_ch0>0){
             //     printf("Number Filtered Elements: %d\n", filteredElements_ch0);
             // }
@@ -390,12 +450,18 @@ void* mainThread(void* argsUncast){
 
             //Decode packets
             parsePacket(rxPackedDataFiltered_ch0, rxPackedLastFiltered_ch0, filteredElements_ch0, &rx_decoder_state_ch0, &rx_packet_buffer_state_ch0);
+            #ifdef MULTI_CH
             parsePacket(rxPackedDataFiltered_ch1, rxPackedLastFiltered_ch1, filteredElements_ch1, &rx_decoder_state_ch1, &rx_packet_buffer_state_ch1);
             parsePacket(rxPackedDataFiltered_ch2, rxPackedLastFiltered_ch2, filteredElements_ch2, &rx_decoder_state_ch2, &rx_packet_buffer_state_ch2);
             parsePacket(rxPackedDataFiltered_ch3, rxPackedLastFiltered_ch3, filteredElements_ch3, &rx_decoder_state_ch3, &rx_packet_buffer_state_ch3);
+            #endif
 
             //Check recieved packets and print
+            #ifdef MULTI_CH
             processPackets(rx_packet_buffer_states, 4, &currentID, TX_ID_MAX, &currentBuffer, &failureCount, RX_MAX_FAILURES, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT);
+            #else
+            processPackets(rx_packet_buffer_states, 1, &currentID, TX_ID_MAX, &currentBuffer, &failureCount, RX_MAX_FAILURES, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT);
+            #endif
         }
     }
 
@@ -403,12 +469,14 @@ void* mainThread(void* argsUncast){
         //Cleanup
         free(txPacket_ch0);
         free(txModMode_ch0);
+        #ifdef MULTI_CH
         free(txPacket_ch1);
         free(txModMode_ch1);
         free(txPacket_ch2);
         free(txModMode_ch2);
         free(txPacket_ch3);
         free(txModMode_ch3);
+        #endif
     }
 
     return NULL;
