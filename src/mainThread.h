@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include "cyclopsFraming.h"
 
+#define BITS_PER_SYMBOL_PAYLOAD_TX 4 //This changes the transmitted modulation between BPSK=1, QPSK=2, and 16QAM=4
+
 typedef struct{
 char *txPipeName;
 char *txFeedbackPipeName;

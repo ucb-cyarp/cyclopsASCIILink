@@ -105,15 +105,12 @@ void* mainThread(void* argsUncast){
 
         //Create a temporary packet to be used when sending a blank signal
         //TODO: Optimize this
-        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, 1, blankStr, &msgBytesRead);
+        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
         #ifdef MULTI_CH
-        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, 1, blankStr, &msgBytesRead);
-        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, 1, blankStr, &msgBytesRead);
-        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, 1, blankStr, &msgBytesRead);
+        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
+        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
+        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
         #endif
-
-//        txPacketLen_ch0 =  createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txSrc, txDst, txNetID, 4, testText, &msgBytesRead); //Encode a 16QAM Packet
-//        txPacketLen_ch0 =  createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txSrc, txDst, txNetID, 2, testText, &msgBytesRead); //Encode a QPSK Packet
     }
 
     //Tx State
@@ -227,7 +224,7 @@ void* mainThread(void* argsUncast){
                         txIndex = 0;
                         printf("\nStarting to send packet\n");
                         //Create a new packet
-                        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, 1, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
                         //MsgBytesRead indicates how many bytes of the textToBeEncoded were read.  Add this to the text ptr passed to the next one
                         txStrLoc+=msgBytesRead;
                         txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
@@ -238,7 +235,7 @@ void* mainThread(void* argsUncast){
 
                         #ifdef MULTI_CH
 
-                        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, 1, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
                         txStrLoc+=msgBytesRead;
                         txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
                         if(txStrLoc>=txStrLen){
@@ -246,7 +243,7 @@ void* mainThread(void* argsUncast){
                             txStrLoc = 0;
                         }
 
-                        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, 1, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
                         txStrLoc+=msgBytesRead;
                         txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
                         if(txStrLoc>=txStrLen){
@@ -254,7 +251,7 @@ void* mainThread(void* argsUncast){
                             txStrLoc = 0;
                         }
 
-                        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, 1, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
                         txStrLoc+=msgBytesRead;
                         txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
                         if(txStrLoc>=txStrLen){
