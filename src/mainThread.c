@@ -425,6 +425,7 @@ void* mainThread(void* argsUncast){
             //Ch0
             RX_PACKED_DATATYPE rxPackedDataFiltered_ch0[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch0[RX_BLOCK_SIZE*maxBlocksToProcess];
+            #ifdef MULTI_CH
             //Ch1
             RX_PACKED_DATATYPE rxPackedDataFiltered_ch1[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch1[RX_BLOCK_SIZE*maxBlocksToProcess];
@@ -434,6 +435,7 @@ void* mainThread(void* argsUncast){
             //Ch3
             RX_PACKED_DATATYPE rxPackedDataFiltered_ch3[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
             RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch3[RX_BLOCK_SIZE*maxBlocksToProcess];
+            #endif
 
             int filteredElements_ch0  = repackRxData(rxPackedDataFiltered_ch0, rxPackedLastFiltered_ch0, rxPackedData_ch0, rxPackedLast_ch0, rxPackedValid_ch0, rawElementsRead, &remainingPacked_ch0, &remainingLast_ch0, &remainingBits_ch0, &phaseCounter_ch0);
             #ifdef MULTI_CH

@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include "vitisStructure.h"
 
-#define PREAMBLE_SYMBOL_LEN (2752)
+#define PREAMBLE_SYMBOL_LEN (3776)
 #define HEADER_SYMBOL_LEN (64)
 #define MAX_PAYLOAD_SYMBOL_LEN (12256)
 #define CRC_BYTES_LEN (4)
