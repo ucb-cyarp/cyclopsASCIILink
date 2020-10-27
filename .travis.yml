@@ -6,24 +6,16 @@ language: cpp
 
 before_install:
   - git clone git@github.com:ucb-cyarp/cyclopsASCIILink-testfiles.git ../cyclopsASCIILink-testfiles
+  - cd ../cyclopsASCIILink-testfiles
+  - git checkout 0903cbd33ee4eb866aca7cf12a39ebfcd70295b5
+  - cd -
   - cp ../cyclopsASCIILink-testfiles/vitisIncludes/* src/vitisIncludes/.
 
 before_script:
   - if [[ "$COMPILER" = "g++-5"        ]] && [[ "$TRAVIS_OS_NAME" != "osx" ]]; then export CXX="g++-5" CC="gcc-5";              fi
   - if [[ "$COMPILER" = "clang++-3.8"  ]] && [[ "$TRAVIS_OS_NAME" != "osx" ]]; then export CXX="clang++-3.8" CC="clang-3.8";    fi
 
-os:
-  - linux
-#  - osx
-
-dist: trusty
-#osx_image: xcode9.4
-
-#compiler:
-#  - clang
-#  - gcc
-
-matrix:
+jobs:
   include:
     - compiler: gcc
       os: linux
@@ -41,9 +33,6 @@ matrix:
 #      os: osx
 #      osx_image: xcode9.4
 #      env: COMPILER=clang++
-  exclude:
-    - compiler: gcc
-    - compiler: clang
 
 addons:
   apt:
