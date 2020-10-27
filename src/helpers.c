@@ -28,7 +28,7 @@ int sendData(sharedMemoryFIFO_t* fifo,
              int maxTokens, 
              int *tokens){
 #else
-int sendData(FILE* pipe, 
+int sendData(sharedMemoryFIFO_t* fifo, 
              //Ch0
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
              const TX_MODTYPE_DATATYPE* txModMode_ch0, 
@@ -191,7 +191,7 @@ int recvData(sharedMemoryFIFO_t* fifo,
              RX_PACKED_LAST_DATATYPE* rxPackedLast_ch3, 
              int maxBlocks, bool* doneReading){
 #else
-int recvData(FILE* pipe, 
+int recvData(sharedMemoryFIFO_t* fifo, 
              //Ch0
              RX_PACKED_DATATYPE* rxPackedData_ch0, 
              RX_PACKED_VALID_DATATYPE* rxPackedValid_ch0, 
