@@ -22,7 +22,7 @@ void printHelp(){
     printf("-txperiod: The period (in seconds) between packet transmission\n");
     printf("-txtokens: The number of initial Tx tokens (in blocks).  Tokens are replenished via the feedback pipe\n");
     printf("-processlimit: The maximum number of blocks to process at one time\n");
-    printf("-cpu: CPU to run this application on\n");
+    printf("-cpu: CPU to run this application on (does not apply to MacOS)\n");
 }
 
 int main(int argc, char **argv) {
@@ -173,7 +173,6 @@ int main(int argc, char **argv) {
     threadArgs.gain=gain;
 
     //Create Thread
-    cpu_set_t cpuset_app;
     pthread_t thread_app;
     pthread_attr_t attr_app;
 
@@ -184,16 +183,23 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    //Set Thread CPU
-    if(cpu>=0) {
-        CPU_ZERO(&cpuset_app); //Clear cpuset
-        CPU_SET(cpu, &cpuset_app); //Add CPU to cpuset
-        status = pthread_attr_setaffinity_np(&attr_app, sizeof(cpu_set_t), &cpuset_app);//Set thread CPU affinity
-        if (status != 0) {
-            printf("Could not set thread core affinity ... exiting");
-            exit(1);
+    #ifdef __APPLE__
+        printf("Warning: On MacOS, CPU parameter is ignored\n");
+    #else
+        //Can't set thread affinity on MacOS
+        cpu_set_t cpuset_app;
+        
+        //Set Thread CPU
+        if(cpu>=0) {
+            CPU_ZERO(&cpuset_app); //Clear cpuset
+            CPU_SET(cpu, &cpuset_app); //Add CPU to cpuset
+            status = pthread_attr_setaffinity_np(&attr_app, sizeof(cpu_set_t), &cpuset_app);//Set thread CPU affinity
+            if (status != 0) {
+                printf("Could not set thread core affinity ... exiting");
+                exit(1);
+            }
         }
-    }
+    #endif
 
     //Start Thread
     status = pthread_create(&thread_app, &attr_app, mainThread, &threadArgs);
