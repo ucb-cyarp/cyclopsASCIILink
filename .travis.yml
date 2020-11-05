@@ -47,8 +47,12 @@ addons:
 
 script:
   - echo $CXX; echo $CC
-  - mkdir build && cd build
-  - cmake ..
+  - mkdir build-pipe && cd build-pipe
+  - cmake -DBUILD_SHARED_MEM_VERSION=OFF ..
+  - make
+  - cd ..
+  - mkdir build-sm && cd build-sm
+  - cmake -DBUILD_SHARED_MEM_VERSION=ON ..
   - make
 
 notifications:
