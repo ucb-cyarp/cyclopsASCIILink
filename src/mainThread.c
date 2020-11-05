@@ -51,15 +51,15 @@ void* mainThread(void* argsUncast){
 	    size_t txFifoBufferSizeBytes = sizeof(TX_STRUCTURE_TYPE_NAME)*fifoSize;
 	    size_t txFeedbackFifoBufferSizeBytes = sizeof(FEEDBACK_DATATYPE)*fifoSize;
 
-	    if(txSharedName != NULL){
-	        producerOpenInitFIFO(txSharedName, txFifoBufferSizeBytes, &txFifo);
+	    if(txFifoName != NULL){
+	        producerOpenInitFIFO(txFifoName, txFifoBufferSizeBytes, &txFifo);
 	        // printf("Opened Tx FIFO: %s\n", txSharedName);
-	        consumerOpenFIFOBlock(txFeedbackSharedName, txFeedbackFifoBufferSizeBytes, &txFeedbackFifo);
+	        consumerOpenFIFOBlock(txFeedbackFifoName, txFeedbackFifoBufferSizeBytes, &txFeedbackFifo);
 	        // printf("Opened TxFB FIFO: %s\n", txFeedbackSharedName);
 	    }
 
-	    if(rxSharedName != NULL){
-	        consumerOpenFIFOBlock(rxSharedName, rxFifoBufferSizeBytes, &rxFifo);
+	    if(rxFifoName != NULL){
+	        consumerOpenFIFOBlock(rxFifoName, rxFifoBufferSizeBytes, &rxFifo);
 	        // printf("Opened Rx FIFO: %s\n", rxSharedName);
 	    }
 	#else
@@ -126,7 +126,7 @@ void* mainThread(void* argsUncast){
     char* blankStr = "";
 
     //If transmitting, allocate arrays and form a Tx packet
-    if(txFifo != NULL){
+    if(txFifoName != NULL){
         txPacket_ch0 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txModMode_ch0 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         #ifdef MULTI_CH
@@ -380,9 +380,9 @@ void* mainThread(void* argsUncast){
             for(int i = 0; i<maxBlocksToProcess; i++) {
                 //Check for feedback (use select)
 				#ifdef CYCLOPS_ASCII_SHARED_MEM
-					bool feedbackReady = isReadyForReading(&txFeedbackPipe);
+					bool feedbackReady = isReadyForReading(&txFeedbackFifo);
 				#else
-                	bool feedbackReady = isReadyForReading(txFeedbackPipe);
+                	bool feedbackReady = isReadyForReading(txFeedbackFifo);
 				#endif
                 if(feedbackReady){
                     //Get feedback
@@ -390,19 +390,19 @@ void* mainThread(void* argsUncast){
                     //Once data starts coming, a full transaction should be in process.  Can block on the transaction.
 					
 					#ifdef CYCLOPS_ASCII_SHARED_MEM
-	                    int elementsRead = readFifo(&tokensReturned, sizeof(tokensReturned), 1, &txfbFifo);
+	                    int elementsRead = readFifo(&tokensReturned, sizeof(tokensReturned), 1, &txFeedbackFifo);
 	                    if(elementsRead != 1){
 	                        //Done!
 	                        running = false;
 	                        break;
 	                    }
 					#else
-	                    int elementsRead = fread(&tokensReturned, sizeof(tokensReturned), 1, txFeedbackPipe);
-	                    if(elementsRead != 1 && feof(txFeedbackPipe)){
+	                    int elementsRead = fread(&tokensReturned, sizeof(tokensReturned), 1, txFeedbackFifo);
+	                    if(elementsRead != 1 && feof(txFeedbackFifo)){
 	                        //Done!
 	                        running = false;
 	                        break;
-	                    } else if (elementsRead != 1 && ferror(txFeedbackPipe)){
+	                    } else if (elementsRead != 1 && ferror(txFeedbackFifo)){
 	                        printf("An error was encountered while reading the feedback pipe\n");
 	                        perror(NULL);
 	                        exit(1);
