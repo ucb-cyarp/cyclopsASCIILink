@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef CYCLOPS_ASCII_SHARED_MEM
 bool isReadyForReading(FILE* file){
     //See http://man7.org/linux/man-pages/man2/select.2.html for info on using select
     //See https://stackoverflow.com/questions/3167298/how-can-i-convert-a-file-pointer-file-fp-to-a-file-descriptor-int-fd for getting a fd from a FILE*
@@ -31,10 +32,15 @@ bool isReadyForReading(FILE* file){
     }
     return FD_ISSET(fileFD, &fdSet);
 }
+#endif
 
 //We assume each channel has packets of the same length
 #ifdef MULTI_CH
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int sendData(sharedMemoryFIFO_t* fifo, 
+#else
 int sendData(FILE* pipe, 
+#endif
              //Ch0
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
              const TX_MODTYPE_DATATYPE* txModMode_ch0, 
@@ -52,7 +58,11 @@ int sendData(FILE* pipe,
              int maxTokens, 
              int *tokens){
 #else
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int sendData(sharedMemoryFIFO_t* fifo, 
+#else
 int sendData(FILE* pipe, 
+#endif
              //Ch0
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
              const TX_MODTYPE_DATATYPE* txModMode_ch0, 
@@ -178,17 +188,26 @@ int sendData(FILE* pipe,
         #endif
     }
 
-    //Write to pipe
-    int elementsWritten = fwrite(txStruct, sizeof(TX_STRUCTURE_TYPE_NAME), blockInd, pipe);
-    fflush(pipe);
-    if (elementsWritten != blockInd && ferror(pipe)){
-        printf("An error was encountered while writing\n");
-        perror(NULL);
-        exit(1);
-    } else if (elementsWritten != blockInd){
-        printf("An unknown error was encountered while writing\n");
-        exit(1);
-    }
+    //Write to fifo
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+	    int elementsWritten = writeFifo(txStruct, sizeof(TX_STRUCTURE_TYPE_NAME), blockInd, fifo);
+	    if (elementsWritten != blockInd){
+	        printf("An error was encountered while writing\n");
+	        perror(NULL);
+	        exit(1);
+	    }
+	#else
+	    int elementsWritten = fwrite(txStruct, sizeof(TX_STRUCTURE_TYPE_NAME), blockInd, pipe);
+	    fflush(pipe);
+	    if (elementsWritten != blockInd && ferror(pipe)){
+	        printf("An error was encountered while writing\n");
+	        perror(NULL);
+	        exit(1);
+	    } else if (elementsWritten != blockInd){
+	        printf("An unknown error was encountered while writing\n");
+	        exit(1);
+	    }
+	#endif
 
     //Subtract the tokens
     *tokens -= blockInd;
@@ -196,7 +215,11 @@ int sendData(FILE* pipe,
 }
 
 #ifdef MULTI_CH
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int recvData(sharedMemoryFIFO_t* fifo, 
+#else
 int recvData(FILE* pipe, 
+#endif
              //Ch0
              RX_PACKED_DATATYPE* rxPackedData_ch0, 
              RX_STROBE_DATATYPE* rxPackedStrobe_ch0, 
@@ -219,7 +242,11 @@ int recvData(FILE* pipe,
              RX_PACKED_LAST_DATATYPE* rxPackedLast_ch3, 
              int maxBlocks, bool* doneReading){
 #else
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int recvData(sharedMemoryFIFO_t* fifo, 
+#else
 int recvData(FILE* pipe, 
+#endif
              //Ch0
              RX_PACKED_DATATYPE* rxPackedData_ch0, 
              RX_PACKED_VALID_DATATYPE* rxPackedValid_ch0, 
@@ -230,22 +257,35 @@ int recvData(FILE* pipe,
     int ind = 0;
     for(int i = 0; i<maxBlocks; i++) {
         //Check for input (use select)
+		#ifdef CYCLOPS_ASCII_SHARED_MEM
+		bool inputReady = isReadyForReading(fifo);
+		#else
         bool inputReady = isReadyForReading(pipe);
+		#endif
         if(inputReady){
             RX_STRUCTURE_TYPE_NAME rx;
-            int bytesRead = fread(&rx, sizeof(RX_STRUCTURE_TYPE_NAME), 1, pipe);
-            if(bytesRead != 1 && feof(pipe)){
-                //Done with input (input pipe closed)
-                *doneReading = true;
-                break;
-            } else if (bytesRead != 1 && ferror(pipe)){
-                printf("An error was encountered while reading Rx pipe\n");
-                perror(NULL);
-                exit(1);
-            } else if (bytesRead != 1){
-                printf("An unknown error was encountered while reading Rx pipe\n");
-                exit(1);
-            }
+			#ifdef CYCLOPS_ASCII_SHARED_MEM
+				int bytesRead = readFifo(&rx, sizeof(RX_STRUCTURE_TYPE_NAME), 1, fifo);
+	            if(bytesRead != 1){
+	                //Done with input (input pipe closed)
+	                *doneReading = true;
+	                break;
+	            }
+			#else
+	            int bytesRead = fread(&rx, sizeof(RX_STRUCTURE_TYPE_NAME), 1, pipe);
+	            if(bytesRead != 1 && feof(pipe)){
+	                //Done with input (input pipe closed)
+	                *doneReading = true;
+	                break;
+	            } else if (bytesRead != 1 && ferror(pipe)){
+	                printf("An error was encountered while reading Rx pipe\n");
+	                perror(NULL);
+	                exit(1);
+	            } else if (bytesRead != 1){
+	                printf("An unknown error was encountered while reading Rx pipe\n");
+	                exit(1);
+	            }
+			#endif
 
             #if RX_BLOCK_SIZE == 1
                 //Ch0

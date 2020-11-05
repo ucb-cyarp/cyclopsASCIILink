@@ -11,6 +11,10 @@
 #include "feedbackDefines.h"
 #include "demoText.h"
 
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+#include "depends/BerkeleySharedMemoryFIFO.h"
+#endif
+
 #define TX_ID_MAX (64)
 #define RX_PACKETS_TO_STORE_PER_CH (5)
 #define RX_MAX_FAILURES (10)
@@ -21,46 +25,77 @@
 
 void* mainThread(void* argsUncast){
     threadArgs_t* args = (threadArgs_t*) argsUncast;
-    char *txPipeName = args->txPipeName;
-    char *txFeedbackPipeName = args->txFeedbackPipeName;
-    char *rxPipeName = args->rxPipeName;
+    char *txFifoName = args->txFifoName;
+    char *txFeedbackFifoName = args->txFeedbackFifoName;
+    char *rxFifoName = args->rxFifoName;
     double txPeriod = args->txPeriod;
     int32_t txTokens = args->txTokens;
     int32_t maxBlocksToProcess = args->maxBlocksToProcess;
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+    int32_t fifoSize = args->fifoSize;
+	#endif
     TX_GAIN_DATATYPE gain = args->gain;
 
     //Open Pipes (if applicable)
-    FILE *rxPipe = NULL;
-    FILE *txPipe = NULL;
-    FILE *txFeedbackPipe = NULL;
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+		sharedMemoryFIFO_t txFifo;
+	    sharedMemoryFIFO_t rxFifo;
+	    sharedMemoryFIFO_t txFeedbackFifo;
 
-    if(rxPipeName != NULL){
-        rxPipe= fopen(rxPipeName, "rb");
-        printf("Opening Rx Pipe: %s\n", rxPipeName);
-        if(rxPipe == NULL) {
-            printf("Unable to open Rx Pipe ... exiting\n");
-            perror(NULL);
-            exit(1);
-        }
-    }
+	    //Initialize producer FIFOs first
+	    initSharedMemoryFIFO(&txFifo);
+	    initSharedMemoryFIFO(&rxFifo);
+	    initSharedMemoryFIFO(&txFeedbackFifo);
 
-    if(txPipeName != NULL){
-        txPipe = fopen(txPipeName, "wb");
-        printf("Opening Tx Pipe: %s\n", txPipeName);
-        if(txPipe == NULL){
-            printf("Unable to open Tx Pipe ... exiting\n");
-            perror(NULL);
-            exit(1);
-        }
+	    size_t rxFifoBufferSizeBytes = sizeof(RX_STRUCTURE_TYPE_NAME)*fifoSize;
+	    size_t txFifoBufferSizeBytes = sizeof(TX_STRUCTURE_TYPE_NAME)*fifoSize;
+	    size_t txFeedbackFifoBufferSizeBytes = sizeof(FEEDBACK_DATATYPE)*fifoSize;
 
-        txFeedbackPipe = fopen(txFeedbackPipeName, "rb");
-        printf("Opening Tx Feedback Pipe: %s\n", txFeedbackPipeName);
-        if(txFeedbackPipe == NULL) {
-            printf("Unable to open Tx Feedback Pipe ... exiting\n");
-            perror(NULL);
-            exit(1);
-        }
-    }
+	    if(txSharedName != NULL){
+	        producerOpenInitFIFO(txSharedName, txFifoBufferSizeBytes, &txFifo);
+	        // printf("Opened Tx FIFO: %s\n", txSharedName);
+	        consumerOpenFIFOBlock(txFeedbackSharedName, txFeedbackFifoBufferSizeBytes, &txFeedbackFifo);
+	        // printf("Opened TxFB FIFO: %s\n", txFeedbackSharedName);
+	    }
+
+	    if(rxSharedName != NULL){
+	        consumerOpenFIFOBlock(rxSharedName, rxFifoBufferSizeBytes, &rxFifo);
+	        // printf("Opened Rx FIFO: %s\n", rxSharedName);
+	    }
+	#else
+	    FILE *rxFifo = NULL;
+	    FILE *txFifo = NULL;
+	    FILE *txFeedbackFifo = NULL;
+
+	    if(rxFifoName != NULL){
+	        rxFifo= fopen(rxFifoName, "rb");
+	        printf("Opening Rx Pipe: %s\n", rxFifoName);
+	        if(rxFifo == NULL) {
+	            printf("Unable to open Rx Pipe ... exiting\n");
+	            perror(NULL);
+	            exit(1);
+	        }
+	    }
+
+	    if(txFifoName != NULL){
+	        txFifo = fopen(txFifoName, "wb");
+	        printf("Opening Tx Pipe: %s\n", txFifoName);
+	        if(txFifo == NULL){
+	            printf("Unable to open Tx Pipe ... exiting\n");
+	            perror(NULL);
+	            exit(1);
+	        }
+
+	        txFeedbackFifo = fopen(txFeedbackFifoName, "rb");
+	        printf("Opening Tx Feedback Pipe: %s\n", txFeedbackFifoName);
+	        if(txFeedbackFifo == NULL) {
+	            printf("Unable to open Tx Feedback Pipe ... exiting\n");
+	            perror(NULL);
+	            exit(1);
+	        }
+	    }
+
+	#endif
 
     //Ch0
     TX_SYMBOL_DATATYPE* txPacket_ch0;
@@ -91,7 +126,7 @@ void* mainThread(void* argsUncast){
     char* blankStr = "";
 
     //If transmitting, allocate arrays and form a Tx packet
-    if(txPipe != NULL){
+    if(txFifo != NULL){
         txPacket_ch0 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         txModMode_ch0 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
         #ifdef MULTI_CH
@@ -184,7 +219,7 @@ void* mainThread(void* argsUncast){
     bool running = true;
     while(running){
         //==== Tx ====
-        if(txPipe!=NULL){
+        if(txFifoName!=NULL){
             //If transmissions are OK
             if(txTokens > 0) {
                 //Check if OK to send
@@ -194,7 +229,11 @@ void* mainThread(void* argsUncast){
                     //Send a packet
                     // printf("In process of sending packet\n");
                     #ifdef MULTI_CH
-                    txIndex += sendData(txPipe, 
+					#ifdef CYCLOPS_ASCII_SHARED_MEM
+					txIndex += sendData(&txFifo, 
+					#else
+                    txIndex += sendData(txFifo, 
+					#endif
                                             txPacket_ch0+txIndex, 
                                             txModMode_ch0+txIndex, 
                                             txPacket_ch1+txIndex, 
@@ -208,7 +247,11 @@ void* mainThread(void* argsUncast){
                                             maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
                                             &txTokens);
                     #else
-                    txIndex += sendData(txPipe, 
+                    #ifdef CYCLOPS_ASCII_SHARED_MEM
+					txIndex += sendData(&txFifo, 
+					#else
+                    txIndex += sendData(txFifo, 
+					#endif
                                             txPacket_ch0+txIndex, 
                                             txModMode_ch0+txIndex, 
                                             txPacketLen_ch0-txIndex, 
@@ -268,7 +311,11 @@ void* mainThread(void* argsUncast){
                         //TODO: Will assume packets all have the same length.  Change this later
                         //Check packet lengths match
                         #ifdef MULTI_CH
-                        txIndex += sendData(txPipe, 
+						#ifdef CYCLOPS_ASCII_SHARED_MEM
+						txIndex += sendData(&txFifo, 
+						#else
+                        txIndex += sendData(txFifo,
+						#endif 
                                             txPacket_ch0, 
                                             txModMode_ch0, 
                                             txPacket_ch1, 
@@ -282,7 +329,11 @@ void* mainThread(void* argsUncast){
                                             maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
                                             &txTokens);
                         #else
-                        txIndex += sendData(txPipe, 
+                        #ifdef CYCLOPS_ASCII_SHARED_MEM
+						txIndex += sendData(&txFifo, 
+						#else
+                        txIndex += sendData(txFifo,
+						#endif 
                                             txPacket_ch0, 
                                             txModMode_ch0, 
                                             txPacketLen_ch0, 
@@ -293,7 +344,11 @@ void* mainThread(void* argsUncast){
                         //Write 0's
                         //TODO: Change to a more optimized solution
                         #ifdef MULTI_CH
-                        sendData(txPipe, 
+	                        #ifdef CYCLOPS_ASCII_SHARED_MEM
+							txIndex += sendData(&txFifo, 
+							#else
+	                        txIndex += sendData(txFifo,
+							#endif 
                                 txPacket_ch0, 
                                 txModMode_ch0, 
                                 txPacket_ch1, 
@@ -307,7 +362,11 @@ void* mainThread(void* argsUncast){
                                 maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
                                 &txTokens);
                         #else
-                        sendData(txPipe, 
+	                        #ifdef CYCLOPS_ASCII_SHARED_MEM
+							txIndex += sendData(&txFifo, 
+							#else
+	                        txIndex += sendData(txFifo,
+							#endif 
                                 txPacket_ch0, 
                                 txModMode_ch0, 
                                 0, 
@@ -320,24 +379,39 @@ void* mainThread(void* argsUncast){
 
             for(int i = 0; i<maxBlocksToProcess; i++) {
                 //Check for feedback (use select)
-                bool feedbackReady = isReadyForReading(txFeedbackPipe);
+				#ifdef CYCLOPS_ASCII_SHARED_MEM
+					bool feedbackReady = isReadyForReading(&txFeedbackPipe);
+				#else
+                	bool feedbackReady = isReadyForReading(txFeedbackPipe);
+				#endif
                 if(feedbackReady){
                     //Get feedback
                     FEEDBACK_DATATYPE tokensReturned;
                     //Once data starts coming, a full transaction should be in process.  Can block on the transaction.
-                    int elementsRead = fread(&tokensReturned, sizeof(tokensReturned), 1, txFeedbackPipe);
-                    if(elementsRead != 1 && feof(txFeedbackPipe)){
-                        //Done!
-                        running = false;
-                        break;
-                    } else if (elementsRead != 1 && ferror(txFeedbackPipe)){
-                        printf("An error was encountered while reading the feedback pipe\n");
-                        perror(NULL);
-                        exit(1);
-                    } else if (elementsRead != 1){
-                        printf("An unknown error was encountered while reading the feedback pipe\n");
-                        exit(1);
-                    }
+					
+					#ifdef CYCLOPS_ASCII_SHARED_MEM
+	                    int elementsRead = readFifo(&tokensReturned, sizeof(tokensReturned), 1, &txfbFifo);
+	                    if(elementsRead != 1){
+	                        //Done!
+	                        running = false;
+	                        break;
+	                    }
+					#else
+	                    int elementsRead = fread(&tokensReturned, sizeof(tokensReturned), 1, txFeedbackPipe);
+	                    if(elementsRead != 1 && feof(txFeedbackPipe)){
+	                        //Done!
+	                        running = false;
+	                        break;
+	                    } else if (elementsRead != 1 && ferror(txFeedbackPipe)){
+	                        printf("An error was encountered while reading the feedback pipe\n");
+	                        perror(NULL);
+	                        exit(1);
+	                    } else if (elementsRead != 1){
+	                        printf("An unknown error was encountered while reading the feedback pipe\n");
+	                        exit(1);
+	                    }
+					#endif
+					
                     txTokens += tokensReturned;
                 }else{
                     break;
@@ -346,7 +420,7 @@ void* mainThread(void* argsUncast){
         }
 
         //==== Rx ====
-        if(rxPipe!=NULL){
+        if(rxFifoName!=NULL){
             //Read and print
             //Ch0
             RX_PACKED_DATATYPE rxPackedData_ch0[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
@@ -372,7 +446,11 @@ void* mainThread(void* argsUncast){
 
             bool isDoneReading = false;
             #ifdef MULTI_CH
-            int rawElementsRead = recvData(rxPipe,
+			#ifdef CYCLOPS_ASCII_SHARED_MEM
+			int rawElementsRead = recvData(&rxFifo,
+			#else
+            int rawElementsRead = recvData(rxFifo,
+			#endif
                                            //Ch0 
                                            rxPackedData_ch0, 
                                            rxPackedStrobe_ch0, 
@@ -395,7 +473,11 @@ void* mainThread(void* argsUncast){
                                            rxPackedLast_ch3, 
                                            maxBlocksToProcess, &isDoneReading);
             #else
-            int rawElementsRead = recvData(rxPipe,
+            #ifdef CYCLOPS_ASCII_SHARED_MEM
+			int rawElementsRead = recvData(&rxFifo,
+			#else
+            int rawElementsRead = recvData(rxFifo,
+			#endif
                                            //Ch0 
                                            rxPackedData_ch0, 
                                            rxPackedValid_ch0, 
@@ -464,8 +546,12 @@ void* mainThread(void* argsUncast){
         }
     }
 
-    if(txPipe != NULL){
+    if(txFifoName != NULL){
         //Cleanup
+		#ifdef CYCLOPS_ASCII_SHARED_MEM
+			cleanupProducer(&txFifo);
+	        cleanupConsumer(&txFeedbackFifo);
+		#endif
         free(txPacket_ch0);
         free(txModMode_ch0);
         #ifdef MULTI_CH
@@ -477,6 +563,12 @@ void* mainThread(void* argsUncast){
         free(txModMode_ch3);
         #endif
     }
+
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+	    if(rxFifoName != NULL){
+	        cleanupConsumer(&rxFifo);
+	    }
+	#endif
 
     return NULL;
 }

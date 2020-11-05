@@ -12,10 +12,12 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 find_package(Threads)
+find_library(LIBRT rt)
+if(NOT LIBRT)
+    message(FATAL_ERROR "librt not found")
+endif()
 
 set(CMAKE_C_STANDARD 11)
-
-add_compile_options("$<$<CONFIG:RELEASE>:-O3>")
 
 set(COMMON_SRCS
         src/cyclopsFraming.c
@@ -27,7 +29,9 @@ set(COMMON_SRCS
         src/demoText.c
         src/demoText.h
         src/mainThread.c
-        src/mainThread.h)
+        src/mainThread.h
+        src/depends/BerkeleySharedMemoryFIFO.c
+        src/depends/BerkeleySharedMemoryFIFO.h)
 
 add_executable(cyclopsASCIILink src/main.c ${COMMON_SRCS})
-target_link_libraries(cyclopsASCIILink ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(cyclopsASCIILink ${CMAKE_THREAD_LIBS_INIT} ${LIBRT})

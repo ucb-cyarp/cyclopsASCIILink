@@ -10,11 +10,19 @@
 #include "cyclopsFraming.h"
 #include "vitisStructure.h"
 
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+#include "depends/BerkeleySharedMemoryFIFO.h"
+#else
 bool isReadyForReading(FILE* file);
+#endif
 
 //Returns the number of elements (not blocks) written
 #ifdef MULTI_CH
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int sendData(sharedMemoryFIFO_t* fifo, 
+#else
 int sendData(FILE* pipe, 
+#endif
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
              const TX_MODTYPE_DATATYPE* txModMode_ch0, 
              const TX_SYMBOL_DATATYPE* txPacket_ch1, 
@@ -28,7 +36,11 @@ int sendData(FILE* pipe,
              int maxTokens, 
              int *tokens);
 #else
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int sendData(sharedMemoryFIFO_t* fifo, 
+#else
 int sendData(FILE* pipe, 
+#endif
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
              const TX_MODTYPE_DATATYPE* txModMode_ch0, 
              int maxLenAvail, 
@@ -38,7 +50,11 @@ int sendData(FILE* pipe,
 
 //Returns the number of elements (not blocks) read
 #ifdef MULTI_CH
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int recvData(sharedMemoryFIFO_t* fifo, 
+#else
 int recvData(FILE* pipe, 
+#endif
              //Ch0
              RX_PACKED_DATATYPE* rxPackedData_ch0, 
              RX_STROBE_DATATYPE* rxPackedStrobe_ch0, 
@@ -61,7 +77,11 @@ int recvData(FILE* pipe,
              RX_PACKED_LAST_DATATYPE* rxPackedLast_ch3, 
              int maxBlocks, bool* doneReading);
 #else
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int recvData(sharedMemoryFIFO_t* fifo, 
+#else
 int recvData(FILE* pipe, 
+#endif
              //Ch0
              RX_PACKED_DATATYPE* rxPackedData_ch0, 
              RX_PACKED_VALID_DATATYPE* rxPackedValid_ch0, 

@@ -22,18 +22,24 @@ void printHelp(){
     printf("-txperiod: The period (in seconds) between packet transmission\n");
     printf("-txtokens: The number of initial Tx tokens (in blocks).  Tokens are replenished via the feedback pipe\n");
     printf("-processlimit: The maximum number of blocks to process at one time\n");
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+	printf("-fifosize: The size of the FIFO in blocks\n");
+	#endif
     printf("-cpu: CPU to run this application on (negative number to not pin to a particular CPU, does not apply to MacOS)\n");
 }
 
 int main(int argc, char **argv) {
     //--- Parse the arguments ---
-    char *txPipeName = NULL;
-    char *txFeedbackPipeName = NULL;
-    char *rxPipeName = NULL;
+    char *txFifoName = NULL;
+    char *txFeedbackFifoName = NULL;
+    char *rxFifoName = NULL;
 
     double txPeriod = 1.0;
     int32_t txTokens = 500;
     int32_t maxBlocksToProcess = 10;
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+    	int32_t fifoSize = 8;
+	#endif
     int cpu = -1;
     TX_GAIN_DATATYPE gain = 1;  //TODO: Add to parameters list
 
@@ -51,7 +57,7 @@ int main(int argc, char **argv) {
             }
 
             if(i<argc){
-                rxPipeName = argv[i];
+                rxFifoName = argv[i];
             }else{
                 printf("Missing argument for -rx\n");
                 exit(1);
@@ -65,7 +71,7 @@ int main(int argc, char **argv) {
             }
 
             if(i<argc){
-                txPipeName = argv[i];
+                txFifoName = argv[i];
             }else{
                 printf("Missing argument for -tx\n");
                 exit(1);
@@ -79,7 +85,7 @@ int main(int argc, char **argv) {
             }
 
             if(i<argc){
-                txFeedbackPipeName = argv[i];
+                txFeedbackFifoName = argv[i];
             }else{
                 printf("Missing argument for -txfb\n");
                 exit(1);
@@ -118,6 +124,20 @@ int main(int argc, char **argv) {
                 printf("Missing argument for -txtokens\n");
                 exit(1);
             }
+		#ifdef CYCLOPS_ASCII_SHARED_MEM
+        }else if(strcmp("-fifosize", argv[i]) == 0){
+            i++; //Get the actual argument
+
+            if(i<argc){
+                fifoSize = strtol(argv[i], NULL, 10);
+                if(fifoSize <= 0){
+                    printf("-fifosize must be positive\n");
+                }
+            }else{
+                printf("Missing argument for -fifosize\n");
+                exit(1);
+            }
+		#endif
         }else if(strcmp("-processlimit", argv[i]) == 0) {
             i++; //Get the actual argument
 
@@ -149,24 +169,27 @@ int main(int argc, char **argv) {
         }
     }
 
-    if((txPipeName == NULL && txFeedbackPipeName != NULL) || (txPipeName != NULL && txFeedbackPipeName == NULL)){
+    if((txFifoName == NULL && txFeedbackFifoName != NULL) || (txFifoName != NULL && txFeedbackFifoName == NULL)){
         printf("-tx and -txfb must come as a pair\n");
         exit(1);
     }
 
-    if(txPipeName == NULL && rxPipeName == NULL){
+    if(txFifoName == NULL && rxFifoName == NULL){
         exit(0);
     }
 
     //Create Thread Args
     threadArgs_t threadArgs;
-    threadArgs.txPipeName=txPipeName;
-    threadArgs.txFeedbackPipeName=txFeedbackPipeName;
-    threadArgs.rxPipeName=rxPipeName;
+    threadArgs.txFifoName=txFifoName;
+    threadArgs.txFeedbackFifoName=txFeedbackFifoName;
+    threadArgs.rxFifoName=rxFifoName;
 
     threadArgs.txPeriod=txPeriod;
     threadArgs.txTokens=txTokens;
     threadArgs.maxBlocksToProcess=maxBlocksToProcess;
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+    	threadArgs.fifoSize=fifoSize;
+	#endif
     threadArgs.gain=gain;
 
     //Create Thread
