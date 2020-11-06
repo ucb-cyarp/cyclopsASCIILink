@@ -21,9 +21,12 @@ int32_t maxBlocksToProcess;
 #ifdef CYCLOPS_ASCII_SHARED_MEM
 int32_t fifoSize; //Size in blocks
 #endif
+double txDutyCycle;
+int rxSubsamplePeriod;
 TX_GAIN_DATATYPE gain;
 } threadArgs_t;
 
-void* mainThread(void* args);
+void* mainThread_slowPPS(void* args);
+void* mainThread_fastPPS(void* args);
 
 #endif //CYCLOPSASCIILINK_MAINTHREAD_H

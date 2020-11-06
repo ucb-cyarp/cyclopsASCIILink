@@ -43,10 +43,11 @@ set(COMMON_SRCS
         src/vitisStructure.h
         src/demoText.c
         src/demoText.h
-        src/mainThread.c
+        src/mainThread_slowPPS.c
+        src/mainThread_fastPPS.c
         src/mainThread.h)
 
-set(LIBS_TO_LINK ${CMAKE_THREAD_LIBS_INIT})
+set(LIBS_TO_LINK ${CMAKE_THREAD_LIBS_INIT} m) #Also need to link against libm (m)
 
 if(BUILD_SHARED_MEM_VERSION)
         set(COMMON_SRCS

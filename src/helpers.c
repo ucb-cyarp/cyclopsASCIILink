@@ -35,11 +35,15 @@ bool isReadyForReading(FILE* file){
 #endif
 
 //We assume each channel has packets of the same length
+//Note: This method sends complete blocks to the Tx radio.  If there is not a full
+//block left availible in the packet to send, it will append zeros (blank) to the end
+//of the last block.  If it was requested to send more blocks than there are blocks
+//available in the src packet it will create blank blocks to send
 #ifdef MULTI_CH
 #ifdef CYCLOPS_ASCII_SHARED_MEM
-int sendData(sharedMemoryFIFO_t* fifo, 
+sendRtn_t sendData(sharedMemoryFIFO_t* fifo,
 #else
-int sendData(FILE* pipe, 
+sendRtn_t sendData(FILE* pipe,
 #endif
              //Ch0
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
@@ -59,9 +63,9 @@ int sendData(FILE* pipe,
              int *tokens){
 #else
 #ifdef CYCLOPS_ASCII_SHARED_MEM
-int sendData(sharedMemoryFIFO_t* fifo, 
+sendRtn_t sendData(sharedMemoryFIFO_t* fifo,
 #else
-int sendData(FILE* pipe, 
+sendRtn_t sendData(FILE* pipe,
 #endif
              //Ch0
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
@@ -75,6 +79,7 @@ int sendData(FILE* pipe,
 
     int txCursor = 0;
     int blockInd = 0;
+    int blankCount = 0;
 
     while(blockInd<maxTokens) {
         //Create packets to send
@@ -125,6 +130,7 @@ int sendData(FILE* pipe,
                 txStruct[blockInd].TX_GAIN_CH3_MEMBER_NAME = gain;
                 txStruct[blockInd].TX_ZERO_CH3_MEMBER_NAME = TX_ZERO_BLANK_DATA;
                 #endif
+                blankCount++;
             }
             blockInd++;
         #else
@@ -185,6 +191,7 @@ int sendData(FILE* pipe,
 
             blockInd++;
             txCursor+=len;
+            blankCount+=TX_BLOCK_SIZE-len;
         #endif
     }
 
@@ -211,7 +218,75 @@ int sendData(FILE* pipe,
 
     //Subtract the tokens
     *tokens -= blockInd;
-    return txCursor;
+    sendRtn_t rtn;
+    rtn.elementsSent = txCursor;
+    rtn.blanksSent = blankCount;
+    return rtn;
+}
+
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int sendBlank(sharedMemoryFIFO_t* fifo,
+#else
+int sendBlank(FILE* pipe,
+#endif
+         int blanksRequested,
+         int maxTokens,
+         int *tokens) {
+
+    int blankBlocksRequested = blanksRequested/TX_BLOCK_SIZE;
+    int blankBlocksToSend = blankBlocksRequested < maxTokens ? blankBlocksRequested : maxTokens;
+
+    TX_STRUCTURE_TYPE_NAME txStruct[blankBlocksToSend];
+
+    //Fill the structures with blanks
+    for(int blk = 0; blk<blankBlocksToSend; blk++){
+        for(int i = 0; i<TX_BLOCK_SIZE; i++){
+            //Ch0
+            txStruct[blk].TX_SYMBOL_CH0_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+            txStruct[blk].TX_MODTYPE_CH0_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+            txStruct[blk].TX_EN_CH0_MEMBER_NAME[i] = TX_EN_BLANK_DATA;
+            #ifdef MULTI_CH
+            //Ch1
+            txStruct[blk].TX_SYMBOL_CH1_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+            txStruct[blk].TX_MODTYPE_CH1_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+            txStruct[blk].TX_GAIN_CH1_MEMBER_NAME[i] = gain;
+            txStruct[blk].TX_ZERO_CH1_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+            //Ch2
+            txStruct[blk].TX_SYMBOL_CH2_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+            txStruct[blk].TX_MODTYPE_CH2_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+            txStruct[blk].TX_GAIN_CH2_MEMBER_NAME[i] = gain;
+            txStruct[blk].TX_ZERO_CH2_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+            //Ch3
+            txStruct[blk].TX_SYMBOL_CH3_MEMBER_NAME[i] = TX_SYMBOL_BLANK_VAL;
+            txStruct[blk].TX_MODTYPE_CH3_MEMBER_NAME[i] = TX_MODTYPE_BLANK_VAL;
+            txStruct[blk].TX_GAIN_CH3_MEMBER_NAME[i] = gain;
+            txStruct[blk].TX_ZERO_CH3_MEMBER_NAME[i] = TX_ZERO_BLANK_DATA;
+            #endif
+        }
+    }
+
+    //Write to fifo
+    #ifdef CYCLOPS_ASCII_SHARED_MEM
+        int elementsWritten = writeFifo(txStruct, sizeof(TX_STRUCTURE_TYPE_NAME), blankBlocksToSend, fifo);
+            if (elementsWritten != blankBlocksToSend){
+                printf("An error was encountered while writing\n");
+                perror(NULL);
+                exit(1);
+            }
+    #else
+        int elementsWritten = fwrite(txStruct, sizeof(TX_STRUCTURE_TYPE_NAME), blankBlocksToSend, pipe);
+        fflush(pipe);
+        if (elementsWritten != blankBlocksToSend && ferror(pipe)){
+            printf("An error was encountered while writing\n");
+            perror(NULL);
+            exit(1);
+        } else if (elementsWritten != blankBlocksToSend){
+            printf("An unknown error was encountered while writing\n");
+            exit(1);
+        }
+    #endif
+
+    return blankBlocksToSend*TX_BLOCK_SIZE;
 }
 
 #ifdef MULTI_CH

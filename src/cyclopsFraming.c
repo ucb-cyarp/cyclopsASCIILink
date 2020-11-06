@@ -379,6 +379,31 @@ int repackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resu
 
     for(int i = 0; i<rawLen; i++){
         if(*phaseCounter == 0 && rawValid[i]){
+            //This is a valid return value
+            //Check if this is the first value after the end of the last flag.
+            //If so, this should reset the allignment for the new packet
+            //A reset is unessisary if this is at the start of a new packed value
+            if(repackedLastLocal && !rawPackedLast[i]){
+                //New packet is being Rx-ed
+                if(currentBits > 0){
+                    //Need to send out the current block being packed since it contains part of the last packet
+                    while(currentBits<sizeof(RX_PACKED_DATATYPE)*8){
+                        repackedLocal = repackedLocal >> RX_PACKED_BITS;
+                        currentBits += RX_PACKED_BITS;
+                    }
+
+                    //Complete, store
+                    resultPacked[dstInd] = repackedLocal;
+                    resultPackedLast[dstInd] = repackedLastLocal;
+                    dstInd++;
+
+                    //Reset state
+                    currentBits = 0;
+                    repackedLocal = 0;
+                    repackedLastLocal = false;
+                }
+                //Else, no action needed
+            }
             repackedLocal = (rawPacked[i] << newShiftAmt)|(repackedLocal >> RX_PACKED_BITS);
             repackedLastLocal = repackedLastLocal || rawPackedLast[i];
             currentBits += RX_PACKED_BITS;
@@ -393,6 +418,87 @@ int repackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resu
                 currentBits = 0;
                 repackedLocal = 0;
                 repackedLastLocal = false;
+            }
+        }
+        *phaseCounter = *phaseCounter < (RX_REPITITIONS_PER_OUTPUT-1) ? (*phaseCounter)+1 : 0;
+    }
+
+    *remainingBits = currentBits;
+    *remainingPacked = repackedLocal;
+    *remainingLast = repackedLastLocal;
+
+    return dstInd;
+}
+
+int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits, int *phaseCounter, int *pktRxCounter, int *pktRxCounterTotal, int processOneInN){
+    int dstInd = 0;
+
+    static_assert(sizeof(RX_PACKED_DATATYPE)*8 % RX_PACKED_BITS == 0, "RX_PACKED_DATATYPE must be a multiple of RX_PACKED_BITS"); //Simplfies computation for now
+    static_assert(sizeof(RX_PACKED_DATATYPE) == 1, "For now, restriciting RX_PACKED_DATATYPE to bytes for sanitization code"); //TODO: change
+
+    int currentBits = *remainingBits;
+    RX_PACKED_DATATYPE repackedLocal = *remainingPacked;
+    RX_PACKED_LAST_DATATYPE repackedLastLocal = *remainingLast;
+
+    int newShiftAmt = sizeof(RX_PACKED_DATATYPE)*8 - RX_PACKED_BITS;
+
+    for(int i = 0; i<rawLen; i++){
+        if(*phaseCounter == 0 && rawValid[i]){
+            if(repackedLastLocal && !rawPackedLast[i]){
+                //This is the start of a new packet
+
+                //If a packet was being processed before, it needs to be kicked out
+                if(*pktRxCounter == 0){
+                    if(currentBits > 0){
+                        //Need to send out the current block being packed since it contains part of the last packet
+                        while(currentBits<sizeof(RX_PACKED_DATATYPE)*8){
+                            repackedLocal = repackedLocal >> RX_PACKED_BITS;
+                            currentBits += RX_PACKED_BITS;
+                        }
+
+                        //Complete, store
+                        resultPacked[dstInd] = repackedLocal;
+                        resultPackedLast[dstInd] = repackedLastLocal;
+                        dstInd++;
+
+                        //Reset state
+                        currentBits = 0;
+                        repackedLocal = 0;
+                        repackedLastLocal = false;
+                    }
+
+                    //reset the packet counter
+                    *pktRxCounter=0;
+                    //increment the total packet count
+                    *pktRxCounterTotal++;
+                }else{
+                    //A packet was not being processed before, increment the packet counters
+                    *pktRxCounter++;
+                    *pktRxCounterTotal++;
+                }
+            }
+
+            if(*pktRxCounter == 0) {
+                //This is a valid return value for a packet that is being processed
+                //Pack it
+                repackedLocal = (rawPacked[i] << newShiftAmt) | (repackedLocal >> RX_PACKED_BITS);
+                repackedLastLocal = repackedLastLocal || rawPackedLast[i];
+                currentBits += RX_PACKED_BITS;
+                if (currentBits == sizeof(RX_PACKED_DATATYPE) * 8) {
+                    //Complete, store
+                    resultPacked[dstInd] = repackedLocal;
+                    resultPackedLast[dstInd] = repackedLastLocal;
+                    // printf("0b%d%d%d%d %d%d%d%d [%c] (%d)\n", (resultPacked[dstInd]>>7)&1, (resultPacked[dstInd]>>6)&1, (resultPacked[dstInd]>>5)&1, (resultPacked[dstInd]>>4)&1, (resultPacked[dstInd]>>3)&1, (resultPacked[dstInd]>>2)&1, (resultPacked[dstInd]>>1)&1, (resultPacked[dstInd])&1, resultPacked[dstInd], resultPackedLast[dstInd]);
+                    dstInd++;
+
+                    //Reset state
+                    currentBits = 0;
+                    repackedLocal = 0;
+                    repackedLastLocal = false;
+                }
+            }else{
+                //Still need to keep track of last values even when we are not "processing" a packet
+                repackedLastLocal = repackedLastLocal || rawPackedLast[i];
             }
         }
         *phaseCounter = *phaseCounter < (RX_REPITITIONS_PER_OUTPUT-1) ? (*phaseCounter)+1 : 0;
@@ -965,5 +1071,60 @@ void processPackets(packet_buffer_state_t** buffers, int numBuffers, int* curren
         printf("Error Cluster, Rx Processing Resetting...\n");
         *failureCount = 0;
 
+    }
+}
+
+void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, int maxID, int *currentBuffer, bool printTitle, bool printDetails, bool printContent, int *currentNumPacketsRx){
+    bool running = true;
+
+    if(printTitle) {
+        bool buffersHaveContent = false;
+        for (int i = 0; i < numBuffers; i++) {
+            if (buffers[i]->packetBufferOccupancy > 0) {
+                buffersHaveContent = true;
+                break;
+            }
+        }
+        if (buffersHaveContent) {
+            //If there is a packet to print, print this brief status message
+            setColor(BG_COLOR, FG_COLOR_START + numBuffers + 1, RESET); //Invert FG/BG for title
+            for (int i = 0; i < numBuffers; i++) {
+                printf("Ch. %d Packet Rx-ed: %d\n", i, currentNumPacketsRx[i]);
+            }
+            setColor(FG_COLOR_DEFAULT, BG_COLOR, RESET);
+        }
+    }
+
+    while(running){
+        //Check the current buffer for occupancy >0
+        packet_buffer_state_t* buffer = buffers[*currentBuffer];
+        if(buffer->packetBufferOccupancy > 0){
+            //There is a packet ready
+            //This packet has the correct ID, print it
+            printPacketStruct(buffer->packetBuffer+(buffer->packetBufferReadInd), *currentBuffer, printTitle, printDetails, printContent);
+            //Advance the read pointer, decrement occupency
+            buffer->packetBufferOccupancy--;
+            buffer->packetBufferReadInd = (buffer->packetBufferReadInd < buffer->packetBufferSize-1) ? buffer->packetBufferReadInd+1 : 0;
+            //Advance the currentBuffer
+            *currentBuffer = *currentBuffer < numBuffers-1 ? *currentBuffer+1 : 0;
+        }else{
+            //Buffer does not have any pending packets
+            //Check if any of the other buffers have >=3 packets
+            //If so, clear them out before returning
+            bool otherBufferWithHighOccupancy = false;
+            for(int i = 0; i<numBuffers; i++){
+                if(buffers[i]->packetBufferOccupancy>3){
+                    otherBufferWithHighOccupancy=true;
+                    break;
+                }
+            }
+
+            if(otherBufferWithHighOccupancy){
+                *currentBuffer = *currentBuffer < numBuffers-1 ? *currentBuffer+1 : 0;
+            }else{
+                //Else, nothing left to process, exit the loop
+                running = false;
+            }
+        }
     }
 }

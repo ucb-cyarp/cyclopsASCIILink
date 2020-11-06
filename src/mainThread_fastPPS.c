@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <math.h>
 
 #include "helpers.h"
 #include "feedbackDefines.h"
@@ -23,18 +24,23 @@
 #define PRINT_RX_DETAILS (true)
 #define PRINT_RX_CONTENT (true)
 
-void* mainThread(void* argsUncast){
+void* mainThread_fastPPS(void* argsUncast){
     threadArgs_t* args = (threadArgs_t*) argsUncast;
     char *txFifoName = args->txFifoName;
     char *txFeedbackFifoName = args->txFeedbackFifoName;
     char *rxFifoName = args->rxFifoName;
-    double txPeriod = args->txPeriod;
+    double txDutyCycle = args->txDutyCycle;
+    int rxSubsamplePeriod = args->rxSubsamplePeriod;
     int32_t txTokens = args->txTokens;
     int32_t maxBlocksToProcess = args->maxBlocksToProcess;
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
     int32_t fifoSize = args->fifoSize;
 	#endif
     TX_GAIN_DATATYPE gain = args->gain;
+
+    //TODO: Make this an arg
+    int numTxPktsToCreate = 128;
+    int randSeed = 8675309;
 
     //Open Pipes (if applicable)
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
@@ -100,61 +106,133 @@ void* mainThread(void* argsUncast){
     //Ch0
     TX_SYMBOL_DATATYPE* txPacket_ch0;
     TX_MODTYPE_DATATYPE* txModMode_ch0;
-    int txPacketLen_ch0 = 0; //In terms of TX_SYMBOL_DATATYPE units
     #ifdef MULTI_CH
     //Ch1
     TX_SYMBOL_DATATYPE* txPacket_ch1;
     TX_MODTYPE_DATATYPE* txModMode_ch1;
-    int txPacketLen_ch1 = 0; //In terms of TX_SYMBOL_DATATYPE units
     //Ch2
     TX_SYMBOL_DATATYPE* txPacket_ch2;
     TX_MODTYPE_DATATYPE* txModMode_ch2;
-    int txPacketLen_ch2 = 0; //In terms of TX_SYMBOL_DATATYPE units
     //Ch3
     TX_SYMBOL_DATATYPE* txPacket_ch3;
     TX_MODTYPE_DATATYPE* txModMode_ch3;
-    int txPacketLen_ch3 = 0; //In terms of TX_SYMBOL_DATATYPE units
     #endif
-    
-    int msgBytesRead = 0;
+
     uint8_t txSrc = 0;
     uint8_t txDst = 1;
     uint16_t txNetID = 10;
 
     int txID = 0; //This is the id number used to order packets
-
     char* blankStr = "";
 
-    //If transmitting, allocate arrays and form a Tx packet
-    if(txFifoName != NULL){
-        txPacket_ch0 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        txModMode_ch0 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        #ifdef MULTI_CH
-        txPacket_ch1 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        txModMode_ch1 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        txPacket_ch2 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        txModMode_ch2 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        txPacket_ch3 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        txModMode_ch3 = (TX_MODTYPE_DATATYPE*) malloc(sizeof(TX_MODTYPE_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
-        #endif
 
-        //Create a temporary packet to be used when sending a blank signal
-        //TODO: Optimize this
-        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
+    //If transmitting, allocate arrays for packets to be constructed before entering the main loop
+    //    All packets will be pre-formed on the Tx side and will be selected for transmission later.
+
+    size_t pktSrcArraySymbolsPerAllocPkt;
+    size_t pktSrcArraySymbolBytesPerAllocPkt;
+    size_t pktSrcArrayModTypeBytesPerAllocPkt;
+    TX_SYMBOL_DATATYPE*  txPacket_srcArray;
+    TX_SYMBOL_DATATYPE* txModMode_srcArray;
+    int txPacketLen = 0;
+
+    if(txFifoName != NULL){
+        pktSrcArraySymbolsPerAllocPkt = MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL;
+        if(TX_DEMO_BLOCK_SIZE>pktSrcArraySymbolsPerAllocPkt) {
+            printf("Block size must be <= the packet length in symbols\n");
+            exit(1);
+        }
+        pktSrcArraySymbolBytesPerAllocPkt = sizeof(TX_SYMBOL_DATATYPE)*pktSrcArraySymbolsPerAllocPkt;
+        pktSrcArrayModTypeBytesPerAllocPkt = sizeof(TX_MODTYPE_DATATYPE)*pktSrcArraySymbolsPerAllocPkt;
+        txPacket_srcArray  = (TX_SYMBOL_DATATYPE*)  malloc(pktSrcArraySymbolBytesPerAllocPkt*numTxPktsToCreate);
+        txModMode_srcArray = (TX_MODTYPE_DATATYPE*) malloc(pktSrcArrayModTypeBytesPerAllocPkt*numTxPktsToCreate);
+
+        //Create packets to select from
+        int txStrLoc = 0; //This is the location we are currently at when sending the txStr
+        const char* txStr = testTextExtraLong;
+        int txStrLen = strlen(txStr);
+
+        for(int i = 0; i<numTxPktsToCreate; i++) {
+            TX_SYMBOL_DATATYPE* txPkt = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*i;
+            TX_MODTYPE_DATATYPE* txModMode = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*i;
+            int msgBytesRead = 0;
+            int pktLen = createRawCyclopsFrame(txPkt, txModMode, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+            if(i == 0) {
+                txPacketLen = pktLen;
+            }else if(pktLen != txPacketLen) {
+                //TODO: allow different length packets
+                //      Only really an issue with multiple chanels sending different packet lengths.
+                //      Requires seperate duty cycle logic for each
+                printf("Packets should have the same length");
+                exit(1);
+            }
+
+            //MsgBytesRead indicates how many bytes of the textToBeEncoded were read.  Add this to the text ptr passed to the next one
+            txStrLoc += msgBytesRead;
+            txID = txID < TX_ID_MAX - 1 ? txID + 1 : 0;
+            if (txStrLoc >= txStrLen) {
+                //Got to the end of the string, wrap around
+                txStrLoc = 0;
+            }
+        }
+
+        //Select Initial packets for each channel
+        srand(randSeed);
+        //Ch0
+        int pktInd_ch0 = rand()%numTxPktsToCreate;
+        txPacket_ch0 = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch0;
+        txModMode_ch0 = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch0;
         #ifdef MULTI_CH
-        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
-        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
-        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
+            //Ch1
+            int pktInd_ch1 = rand()%numTxPktsToCreate;
+            txPacket_ch1 = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch1;
+            txModMode_ch1 = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch1;
+            //Ch2
+            int pktInd_ch2 = rand()%numTxPktsToCreate;
+            txPacket_ch2 = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch2;
+            txModMode_ch2 = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch2;
+            //Ch3
+            int pktInd_ch3 = rand()%numTxPktsToCreate;
+            txPacket_ch3 = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch3;
+            txModMode_ch3 = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch3;
         #endif
     }
 
-    //Tx State
-    int txIndex = txPacketLen_ch0; //The current symbol to be transmitted in the packet
-    time_t lastTxStartTime = time(NULL); //Will transmit after an initial gap
+    //Compute gap symbols
+    //Note: gap symbols will be quantized to blocks
+    //dutyCycle=pktLen/(pktLen+blankLen)
+    //blankLen=pktLen*(1-dutyCycle)/dutyCycle
 
-    int txStrLoc = 0; //This is the location we are currently at when sending the txStr
-    const char* txStr = testTextLong;
-    int txStrLen = strlen(txStr);
+    double blankLenDbl = txPacketLen*(1.0-txDutyCycle)/txDutyCycle;
+    int blankLen = (int) round(blankLenDbl);
+
+    //Because of block quantization, there may be some unavoidable blank samples at the end of a packet
+    int pktBlankPadding = txPacketLen%TX_BLOCK_SIZE;
+
+    int extraBlanksRequired = blankLen-pktBlankPadding;
+    //Note, it is possible for this to be negative if the requested number of blanks is less than the padding required
+    //We will threshold at 0 additional blanks
+    bool warnDutyCycle = false;
+    if(extraBlanksRequired<0) {
+        extraBlanksRequired = 0;
+        warnDutyCycle = true;
+    }
+
+    //The extra blanks need to be quantized to blocks
+    if(extraBlanksRequired%TX_BLOCK_SIZE != 0) {
+        warnDutyCycle = true;
+    }
+    int extraBlankBlocksRequired = (int) round(((double) extraBlanksRequired)/TX_BLOCK_SIZE);
+    int extraBlanksRequiredRounded = extraBlankBlocksRequired*TX_BLOCK_SIZE;
+
+    if(warnDutyCycle) {
+        double actualDutyCycle = ((double) txPacketLen)/(txPacketLen + pktBlankPadding + extraBlanksRequiredRounded);
+        fprintf(stderr, "Warning, requested duty cycle of %f could not be achieved.  Using a duty cycle of %f instead.\n", txDutyCycle, actualDutyCycle);
+    }
+
+    //Tx State
+    int txIndex = 0; //The current symbol to be transmitted in the packet.  Setting to 0 since we already selected packets to send
+    time_t lastTxStartTime = time(NULL); //Will transmit after an initial gap
 
     //Rx State
     rx_decoder_state_t rx_decoder_state_ch0 = {0, 0, 0, 0, 0, 0, 0, 0, NULL};
@@ -181,6 +259,21 @@ void* mainThread(void* argsUncast){
     int currentID = 0;
     int currentBuffer = 0;
     int failureCount = 0;
+
+    int pktRxCounter_ch0 = 0;
+    #ifdef MULTI_CH
+        int pktRxCounter_ch1 = 0;
+        int pktRxCounter_ch2 = 0;
+        int pktRxCounter_ch3 = 0;
+    #endif
+
+    #ifdef MULTI_CH
+    int pktRxCounterTotal[4] = {0, 0, 0, 0};
+    #else
+    int pktRxCounterTotal[1] = {0};
+
+    #endif
+
 
     #ifdef MULTI_CH
     packet_buffer_state_t*  rx_packet_buffer_states[] = {&rx_packet_buffer_state_ch0,
@@ -215,24 +308,26 @@ void* mainThread(void* argsUncast){
     int phaseCounter_ch3 = 0;
     #endif
 
+    int blankCount = 0;
+
     //Main Loop
     bool running = true;
     while(running){
         //==== Tx ====
         if(txFifoName!=NULL){
-            //If transmissions are OK
+            //If transmissions are OK (we have Tx tokens from flow control)
             if(txTokens > 0) {
-                //Check if OK to send
-
-                if(txIndex<txPacketLen_ch0){
-                    //Check if we are currently sending a packet
-                    //Send a packet
+                //Check if we are already sending a packet, are sending blanks
+                //Will select new packets to send after finishing sending blanks
+                if(txIndex<txPacketLen){
+                    //We are currently sending a packet
+                    //Continue sending it
                     // printf("In process of sending packet\n");
                     #ifdef MULTI_CH
 					#ifdef CYCLOPS_ASCII_SHARED_MEM
-					txIndex += sendData(&txFifo, 
+					sendRtn_t sendStatus = sendData(&txFifo,
 					#else
-                    txIndex += sendData(txFifo, 
+                    sendRtn_t sendStatus = sendData(txFifo,
 					#endif
                                             txPacket_ch0+txIndex, 
                                             txModMode_ch0+txIndex, 
@@ -248,135 +343,65 @@ void* mainThread(void* argsUncast){
                                             &txTokens);
                     #else
                     #ifdef CYCLOPS_ASCII_SHARED_MEM
-					txIndex += sendData(&txFifo, 
+                    sendRtn_t sendStatus = sendData(&txFifo,
 					#else
-                    txIndex += sendData(txFifo, 
+                    sendRtn_t sendStatus = sendData(txFifo,
 					#endif
-                                            txPacket_ch0+txIndex, 
+                                            txPacket_ch0+txIndex,
                                             txModMode_ch0+txIndex, 
-                                            txPacketLen_ch0-txIndex, 
+                                            txPacketLen-txIndex,
                                             maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
                                             &txTokens);
                     #endif
+					txIndex += sendStatus.elementsSent;
+					blankCount += sendStatus.blanksSent;
                 }else{
-                    //Should we be sending
-                    time_t currentTime = time(NULL);
-                    double duration = difftime(currentTime, lastTxStartTime);
-                    if(duration >= txPeriod){
-                        lastTxStartTime = currentTime;
-                        txIndex = 0;
-                        printf("\nStarting to send packet\n");
-                        //Create a new packet
-                        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
-                        //MsgBytesRead indicates how many bytes of the textToBeEncoded were read.  Add this to the text ptr passed to the next one
-                        txStrLoc+=msgBytesRead;
-                        txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
-                        if(txStrLoc>=txStrLen){
-                            //Got to the end of the string, wrap around
-                            txStrLoc = 0;
-                        }
+                    //We are done sending the packet
 
-                        #ifdef MULTI_CH
+                    //We may be sending blanks, or we may need to select a new packet to send
+                    if(blankCount < extraBlanksRequiredRounded) {
+                        //sending blanks
+                        int blanksToRequest = extraBlanksRequiredRounded-blankCount;
 
-                        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
-                        txStrLoc+=msgBytesRead;
-                        txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
-                        if(txStrLoc>=txStrLen){
-                            //Got to the end of the string, wrap around
-                            txStrLoc = 0;
-                        }
-
-                        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
-                        txStrLoc+=msgBytesRead;
-                        txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
-                        if(txStrLoc>=txStrLen){
-                            //Got to the end of the string, wrap around
-                            txStrLoc = 0;
-                        }
-
-                        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
-                        txStrLoc+=msgBytesRead;
-                        txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
-                        if(txStrLoc>=txStrLen){
-                            //Got to the end of the string, wrap around
-                            txStrLoc = 0;
-                        }
-
-                        if(txPacketLen_ch0 != txPacketLen_ch1 || txPacketLen_ch0 != txPacketLen_ch2 || txPacketLen_ch0 != txPacketLen_ch3){
-                            printf("Encountered an error generating packets");
-                            exit(1);
-                        }
-                        #endif
-
-                        //TODO: Will assume packets all have the same length.  Change this later
-                        //Check packet lengths match
-                        #ifdef MULTI_CH
-						#ifdef CYCLOPS_ASCII_SHARED_MEM
-						txIndex += sendData(&txFifo, 
-						#else
-                        txIndex += sendData(txFifo,
-						#endif 
-                                            txPacket_ch0, 
-                                            txModMode_ch0, 
-                                            txPacket_ch1, 
-                                            txModMode_ch1, 
-                                            txPacket_ch2, 
-                                            txModMode_ch2, 
-                                            txPacket_ch3, 
-                                            txModMode_ch3, 
-                                            txPacketLen_ch0, 
-                                            gain, 
-                                            maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
-                                            &txTokens);
-                        #else
                         #ifdef CYCLOPS_ASCII_SHARED_MEM
-						txIndex += sendData(&txFifo, 
-						#else
-                        txIndex += sendData(txFifo,
-						#endif 
-                                            txPacket_ch0, 
-                                            txModMode_ch0, 
-                                            txPacketLen_ch0, 
-                                            maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
-                                            &txTokens);
-                        #endif
-                    }else{
-                        //Write 0's
-                        //TODO: Change to a more optimized solution
-                        #ifdef MULTI_CH
-	                        #ifdef CYCLOPS_ASCII_SHARED_MEM
-							txIndex += sendData(&txFifo, 
-							#else
-	                        txIndex += sendData(txFifo,
-							#endif 
-                                txPacket_ch0, 
-                                txModMode_ch0, 
-                                txPacket_ch1, 
-                                txModMode_ch1, 
-                                txPacket_ch2, 
-                                txModMode_ch2, 
-                                txPacket_ch3, 
-                                txModMode_ch3, 
-                                0, 
-                                gain, 
-                                maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
-                                &txTokens);
+                        blankCount += sendBlank(&txFifo,
                         #else
-	                        #ifdef CYCLOPS_ASCII_SHARED_MEM
-							txIndex += sendData(&txFifo, 
-							#else
-	                        txIndex += sendData(txFifo,
-							#endif 
-                                txPacket_ch0, 
-                                txModMode_ch0, 
-                                0, 
-                                maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens, 
-                                &txTokens);
+                        blankCount += sendBlank(txFifo,
+                        #endif
+                                                blanksToRequest,
+                                                maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens,
+                                                &txTokens);
+                    }
+
+                    //Check if after sending blanks (if applicable) new packet(s) need to be chosen
+                    if(blankCount>=extraBlanksRequiredRounded) {
+                        //Reset Tx state for next transmission
+                        txIndex = 0;
+                        blankCount = 0;
+
+                        //Select new packets
+                        int pktInd_ch0 = rand()%numTxPktsToCreate;
+                        txPacket_ch0 = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch0;
+                        txModMode_ch0 = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch0;
+                        #ifdef MULTI_CH
+                            //Ch1
+                            int pktInd_ch1 = rand()%numTxPktsToCreate;
+                            txPacket_ch1 = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch1;
+                            txModMode_ch1 = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch1;
+                            //Ch2
+                            int pktInd_ch2 = rand()%numTxPktsToCreate;
+                            txPacket_ch2 = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch2;
+                            txModMode_ch2 = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch2;
+                            //Ch3
+                            int pktInd_ch3 = rand()%numTxPktsToCreate;
+                            txPacket_ch3 = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch3;
+                            txModMode_ch3 = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*pktInd_ch3;
                         #endif
                     }
                 }
             }
 
+            //Check for feedback returning tokens
             for(int i = 0; i<maxBlocksToProcess; i++) {
                 //Check for feedback (use select)
 				#ifdef CYCLOPS_ASCII_SHARED_MEM
@@ -501,26 +526,31 @@ void* mainThread(void* argsUncast){
             //     }
             // }
 
+            if(txPacketLen<RX_BLOCK_SIZE*maxBlocksToProcess) {
+                fprintf(stderr, "Multiple packets can be received in a single processing iteration which could lead to more discontinuities\n");
+                exit(1);
+                //TODO: To fix this, allocate more extra space below for packet discontinuity
+            }
             //Ch0
-            RX_PACKED_DATATYPE rxPackedDataFiltered_ch0[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
-            RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch0[RX_BLOCK_SIZE*maxBlocksToProcess];
+            RX_PACKED_DATATYPE rxPackedDataFiltered_ch0[RX_BLOCK_SIZE*(maxBlocksToProcess+1)]; //Worst case allocation (+1 for packet discontinuity)
+            RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch0[RX_BLOCK_SIZE*(maxBlocksToProcess+1)];
             #ifdef MULTI_CH
             //Ch1
-            RX_PACKED_DATATYPE rxPackedDataFiltered_ch1[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
-            RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch1[RX_BLOCK_SIZE*maxBlocksToProcess];
+            RX_PACKED_DATATYPE rxPackedDataFiltered_ch1[RX_BLOCK_SIZE*(maxBlocksToProcess+1)]; //Worst case allocation
+            RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch1[RX_BLOCK_SIZE*(maxBlocksToProcess+1)];
             //Ch2
-            RX_PACKED_DATATYPE rxPackedDataFiltered_ch2[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
-            RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch2[RX_BLOCK_SIZE*maxBlocksToProcess];
+            RX_PACKED_DATATYPE rxPackedDataFiltered_ch2[RX_BLOCK_SIZE*(maxBlocksToProcess+1)]; //Worst case allocation
+            RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch2[RX_BLOCK_SIZE*(maxBlocksToProcess+1)];
             //Ch3
-            RX_PACKED_DATATYPE rxPackedDataFiltered_ch3[RX_BLOCK_SIZE*maxBlocksToProcess]; //Worst case allocation
-            RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch3[RX_BLOCK_SIZE*maxBlocksToProcess];
+            RX_PACKED_DATATYPE rxPackedDataFiltered_ch3[RX_BLOCK_SIZE*(maxBlocksToProcess+1)]; //Worst case allocation
+            RX_PACKED_LAST_DATATYPE rxPackedLastFiltered_ch3[RX_BLOCK_SIZE*(maxBlocksToProcess+1)];
             #endif
 
-            int filteredElements_ch0  = repackRxData(rxPackedDataFiltered_ch0, rxPackedLastFiltered_ch0, rxPackedData_ch0, rxPackedLast_ch0, rxPackedValid_ch0, rawElementsRead, &remainingPacked_ch0, &remainingLast_ch0, &remainingBits_ch0, &phaseCounter_ch0);
+            int filteredElements_ch0  = repackRxDataEveryNth(rxPackedDataFiltered_ch0, rxPackedLastFiltered_ch0, rxPackedData_ch0, rxPackedLast_ch0, rxPackedValid_ch0, rawElementsRead, &remainingPacked_ch0, &remainingLast_ch0, &remainingBits_ch0, &phaseCounter_ch0, &pktRxCounter_ch0, pktRxCounterTotal+0, rxSubsamplePeriod);
             #ifdef MULTI_CH
-            int filteredElements_ch1  = repackRxData(rxPackedDataFiltered_ch1, rxPackedLastFiltered_ch1, rxPackedData_ch1, rxPackedLast_ch1, rxPackedValid_ch1, rawElementsRead, &remainingPacked_ch1, &remainingLast_ch1, &remainingBits_ch1, &phaseCounter_ch1);
-            int filteredElements_ch2  = repackRxData(rxPackedDataFiltered_ch2, rxPackedLastFiltered_ch2, rxPackedData_ch2, rxPackedLast_ch2, rxPackedValid_ch2, rawElementsRead, &remainingPacked_ch2, &remainingLast_ch2, &remainingBits_ch2, &phaseCounter_ch2);
-            int filteredElements_ch3  = repackRxData(rxPackedDataFiltered_ch3, rxPackedLastFiltered_ch3, rxPackedData_ch3, rxPackedLast_ch3, rxPackedValid_ch3, rawElementsRead, &remainingPacked_ch3, &remainingLast_ch3, &remainingBits_ch3, &phaseCounter_ch3);
+            int filteredElements_ch1  = repackRxDataEveryNth(rxPackedDataFiltered_ch1, rxPackedLastFiltered_ch1, rxPackedData_ch1, rxPackedLast_ch1, rxPackedValid_ch1, rawElementsRead, &remainingPacked_ch1, &remainingLast_ch1, &remainingBits_ch1, &phaseCounter_ch1, &pktRxCounter_ch0, pktRxCounterTotal+0, rxSubsamplePeriod);
+            int filteredElements_ch2  = repackRxDataEveryNth(rxPackedDataFiltered_ch2, rxPackedLastFiltered_ch2, rxPackedData_ch2, rxPackedLast_ch2, rxPackedValid_ch2, rawElementsRead, &remainingPacked_ch2, &remainingLast_ch2, &remainingBits_ch2, &phaseCounter_ch2, &pktRxCounter_ch1, pktRxCounterTotal+1, rxSubsamplePeriod);
+            int filteredElements_ch3  = repackRxDataEveryNth(rxPackedDataFiltered_ch3, rxPackedLastFiltered_ch3, rxPackedData_ch3, rxPackedLast_ch3, rxPackedValid_ch3, rawElementsRead, &remainingPacked_ch3, &remainingLast_ch3, &remainingBits_ch3, &phaseCounter_ch3, &pktRxCounter_ch2, pktRxCounterTotal+2, rxSubsamplePeriod);
             #endif
 
             // if(filteredElements_ch0>0){
@@ -537,11 +567,11 @@ void* mainThread(void* argsUncast){
             parsePacket(rxPackedDataFiltered_ch3, rxPackedLastFiltered_ch3, filteredElements_ch3, &rx_decoder_state_ch3, &rx_packet_buffer_state_ch3);
             #endif
 
-            //Check recieved packets and print
+            //Print packets
             #ifdef MULTI_CH
-            processPackets(rx_packet_buffer_states, 4, &currentID, TX_ID_MAX, &currentBuffer, &failureCount, RX_MAX_FAILURES, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT);
+            processPacketsNoIDCheck(rx_packet_buffer_states, 4, TX_ID_MAX, &currentBuffer, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT, pktRxCounterTotal);
             #else
-            processPackets(rx_packet_buffer_states, 1, &currentID, TX_ID_MAX, &currentBuffer, &failureCount, RX_MAX_FAILURES, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT);
+            processPacketsNoIDCheck(rx_packet_buffer_states, 1, TX_ID_MAX, &currentBuffer, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT, pktRxCounterTotal);
             #endif
         }
     }
@@ -551,17 +581,9 @@ void* mainThread(void* argsUncast){
 		#ifdef CYCLOPS_ASCII_SHARED_MEM
 			cleanupProducer(&txFifo);
 	        cleanupConsumer(&txFeedbackFifo);
-		#endif
-        free(txPacket_ch0);
-        free(txModMode_ch0);
-        #ifdef MULTI_CH
-        free(txPacket_ch1);
-        free(txModMode_ch1);
-        free(txPacket_ch2);
-        free(txModMode_ch2);
-        free(txPacket_ch3);
-        free(txModMode_ch3);
         #endif
+        free(txPacket_srcArray);
+        free(txModMode_srcArray);
     }
 
 	#ifdef CYCLOPS_ASCII_SHARED_MEM

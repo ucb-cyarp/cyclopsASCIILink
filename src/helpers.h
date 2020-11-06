@@ -17,11 +17,17 @@ bool isReadyForReading(FILE* file);
 #endif
 
 //Returns the number of elements (not blocks) written
+//Also returns the number of blank elements (not blocks) written
+typedef struct sendRtn {
+    int elementsSent;
+    int blanksSent;
+} sendRtn_t ;
+
 #ifdef MULTI_CH
 #ifdef CYCLOPS_ASCII_SHARED_MEM
-int sendData(sharedMemoryFIFO_t* fifo, 
+sendRtn_t sendData(sharedMemoryFIFO_t* fifo,
 #else
-int sendData(FILE* pipe, 
+sendRtn_t sendData(FILE* pipe,
 #endif
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
              const TX_MODTYPE_DATATYPE* txModMode_ch0, 
@@ -37,9 +43,9 @@ int sendData(FILE* pipe,
              int *tokens);
 #else
 #ifdef CYCLOPS_ASCII_SHARED_MEM
-int sendData(sharedMemoryFIFO_t* fifo, 
+sendRtn_t sendData(sharedMemoryFIFO_t* fifo,
 #else
-int sendData(FILE* pipe, 
+sendRtn_t sendData(FILE* pipe,
 #endif
              const TX_SYMBOL_DATATYPE* txPacket_ch0, 
              const TX_MODTYPE_DATATYPE* txModMode_ch0, 
@@ -47,6 +53,15 @@ int sendData(FILE* pipe,
              int maxTokens, 
              int *tokens);
 #endif
+
+#ifdef CYCLOPS_ASCII_SHARED_MEM
+int sendBlank(sharedMemoryFIFO_t* fifo,
+#else
+int sendBlank(FILE* pipe,
+#endif
+              int blanksRequested,
+              int maxTokens,
+              int *tokens);
 
 //Returns the number of elements (not blocks) read
 #ifdef MULTI_CH

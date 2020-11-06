@@ -13,7 +13,9 @@
 #include "mainThread.h"
 
 void printHelp(){
-    printf("cyclopsASCIILink <-rx rx.pipe> <-tx tx.pipe -txfb tx_feedback.pipe> <-txperiod 1.0> <-txtokens 500> <-processlimit 10>\n");
+    printf("cyclopsASCIILink <-rx rx.pipe> <-tx tx.pipe <-txfb tx_feedback.pipe> <-txperiod 1.0> <-txdutycycle 0.5> <-rxsubsampleperiod 200000> <-txtokens 500> <-processlimit 10>\n");
+    printf("\n");
+    printf("The application will default to using the txperiod unless a duty cycle or subsampling period are specified\n");
     printf("\n");
     printf("Optional Arguments:\n");
     printf("-rx: Path to the Rx Pipe\n");
@@ -35,6 +37,8 @@ int main(int argc, char **argv) {
     char *rxFifoName = NULL;
 
     double txPeriod = 1.0;
+    double txDutyCycle = 0.5;
+    int rxSubsamplePeriod = 200000;
     int32_t txTokens = 500;
     int32_t maxBlocksToProcess = 10;
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
@@ -42,6 +46,8 @@ int main(int argc, char **argv) {
 	#endif
     int cpu = -1;
     TX_GAIN_DATATYPE gain = 1;  //TODO: Add to parameters list
+    bool useDutyCycle = false;
+    bool useTxPeriod = false;
 
     if(argc < 2){
         printHelp();
@@ -102,11 +108,54 @@ int main(int argc, char **argv) {
                 txPeriod = strtod(argv[i], NULL);
                 if(txPeriod<=0){
                     printf("-txperiod must be positive\n");
+                    exit(1);
                 }
             }else{
                 printf("Missing argument for -txperiod\n");
                 exit(1);
             }
+
+            useTxPeriod = true;
+        }else if(strcmp("-txdutycycle", argv[i]) == 0){
+            i++; //Get the actual argument
+
+            if(!TX_AVAILABLE){
+                printf("Tx is unavailable in current configuration\n");
+                exit(1);
+            }
+
+            if(i<argc){
+                txDutyCycle = strtod(argv[i], NULL);
+                if(txPeriod<=0){
+                    printf("-txdutycycle must be positive\n");
+                    exit(1);
+                }
+            }else{
+                printf("Missing argument for -txdutycycle\n");
+                exit(1);
+            }
+
+            useDutyCycle = true;
+        }else if(strcmp("-rxsubsampleperiod", argv[i]) == 0){
+            i++; //Get the actual argument
+
+            if(!RX_AVAILABLE){
+                printf("Rx is unavailable in current configuration\n");
+                exit(1);
+            }
+
+            if(i<argc){
+                rxSubsamplePeriod = atoi(argv[i]);
+                if(rxSubsamplePeriod<0){
+                    printf("-rxsubsampleperiod must be >= 0\n");
+                    exit(1);
+                }
+            }else{
+                printf("Missing argument for -rxsubsampleperiod\n");
+                exit(1);
+            }
+
+            useDutyCycle = true;
         }else if(strcmp("-txtokens", argv[i]) == 0){
             i++; //Get the actual argument
 
@@ -119,6 +168,7 @@ int main(int argc, char **argv) {
                 txTokens = strtol(argv[i], NULL, 10);
                 if(txTokens<=0){
                     printf("-txtokens must be positive\n");
+                    exit(1);
                 }
             }else{
                 printf("Missing argument for -txtokens\n");
@@ -178,6 +228,11 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
+    if(useTxPeriod && useDutyCycle){
+        printf("-txdutycycle and/or -rxsubsampleperiod cannot be used in combination with -txperiod\n");
+        exit(1);
+    }
+
     //Create Thread Args
     threadArgs_t threadArgs;
     threadArgs.txFifoName=txFifoName;
@@ -191,6 +246,8 @@ int main(int argc, char **argv) {
     	threadArgs.fifoSize=fifoSize;
 	#endif
     threadArgs.gain=gain;
+    threadArgs.txDutyCycle=txDutyCycle;
+    threadArgs.rxSubsamplePeriod=rxSubsamplePeriod;
 
     //Create Thread
     pthread_t thread_app;
@@ -225,7 +282,12 @@ int main(int argc, char **argv) {
     #endif
 
     //Start Thread
-    status = pthread_create(&thread_app, &attr_app, mainThread, &threadArgs);
+    if(useDutyCycle){
+        status = pthread_create(&thread_app, &attr_app, mainThread_fastPPS, &threadArgs);
+    }else{
+        //Defaults to using Tx period
+        status = pthread_create(&thread_app, &attr_app, mainThread_slowPPS, &threadArgs);
+    }
     if(status != 0)
     {
         printf("Could not create a thread ... exiting");
