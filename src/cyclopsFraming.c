@@ -430,7 +430,7 @@ int repackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resu
     return dstInd;
 }
 
-int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits, int *phaseCounter, int *pktRxCounter, int *pktRxCounterTotal, int processOneInN){
+int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits, int *phaseCounter, int64_t *pktRxCounter, int64_t *pktRxCounterTotal, int64_t processOneInN){
     int dstInd = 0;
 
     static_assert(sizeof(RX_PACKED_DATATYPE)*8 % RX_PACKED_BITS == 0, "RX_PACKED_DATATYPE must be a multiple of RX_PACKED_BITS"); //Simplfies computation for now
@@ -439,6 +439,8 @@ int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATY
     int currentBits = *remainingBits;
     RX_PACKED_DATATYPE repackedLocal = *remainingPacked;
     RX_PACKED_LAST_DATATYPE repackedLastLocal = *remainingLast;
+    int64_t pktRxCounterLocal = *pktRxCounter;
+    int64_t pktRxCounterTotalLocal = *pktRxCounterTotal;
 
     int newShiftAmt = sizeof(RX_PACKED_DATATYPE)*8 - RX_PACKED_BITS;
 
@@ -448,7 +450,7 @@ int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATY
                 //This is the start of a new packet
 
                 //If a packet was being processed before, it needs to be kicked out
-                if(*pktRxCounter == 0){
+                if(pktRxCounterLocal == 0){
                     if(currentBits > 0){
                         //Need to send out the current block being packed since it contains part of the last packet
                         while(currentBits<sizeof(RX_PACKED_DATATYPE)*8){
@@ -464,25 +466,30 @@ int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATY
                         //Reset state
                         currentBits = 0;
                         repackedLocal = 0;
-                        repackedLastLocal = false;
-                    }
+                    }   
+                }
 
-                    //reset the packet counter
-                    *pktRxCounter=0;
-                    //increment the total packet count
-                    *pktRxCounterTotal++;
-                }else{
-                    //A packet was not being processed before, increment the packet counters
-                    *pktRxCounter++;
-                    *pktRxCounterTotal++;
+                //increment the packet counts since we are moving onto a new packet
+                (pktRxCounterLocal)++;
+                (pktRxCounterTotalLocal)++;
+
+                //Reset the last tracking since we have handled the packet edge
+                repackedLastLocal = false;
+
+                if(pktRxCounterLocal >= processOneInN){
+                    //Check if we should process this new packet
+                    //If the period is set to 0, or 1 every packet will be printed
+                    pktRxCounterLocal = 0;
                 }
             }
 
-            if(*pktRxCounter == 0) {
+            //Still need to keep track of last values even when we are not "processing" a packet
+            repackedLastLocal = repackedLastLocal || rawPackedLast[i];
+
+            if(pktRxCounterLocal == 0) {
                 //This is a valid return value for a packet that is being processed
                 //Pack it
                 repackedLocal = (rawPacked[i] << newShiftAmt) | (repackedLocal >> RX_PACKED_BITS);
-                repackedLastLocal = repackedLastLocal || rawPackedLast[i];
                 currentBits += RX_PACKED_BITS;
                 if (currentBits == sizeof(RX_PACKED_DATATYPE) * 8) {
                     //Complete, store
@@ -494,11 +501,7 @@ int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATY
                     //Reset state
                     currentBits = 0;
                     repackedLocal = 0;
-                    repackedLastLocal = false;
                 }
-            }else{
-                //Still need to keep track of last values even when we are not "processing" a packet
-                repackedLastLocal = repackedLastLocal || rawPackedLast[i];
             }
         }
         *phaseCounter = *phaseCounter < (RX_REPITITIONS_PER_OUTPUT-1) ? (*phaseCounter)+1 : 0;
@@ -507,6 +510,9 @@ int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATY
     *remainingBits = currentBits;
     *remainingPacked = repackedLocal;
     *remainingLast = repackedLastLocal;
+
+    *pktRxCounter = pktRxCounterLocal;
+    *pktRxCounterTotal = pktRxCounterTotalLocal;
 
     return dstInd;
 }
@@ -1074,7 +1080,7 @@ void processPackets(packet_buffer_state_t** buffers, int numBuffers, int* curren
     }
 }
 
-void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, int maxID, int *currentBuffer, bool printTitle, bool printDetails, bool printContent, int *currentNumPacketsRx){
+void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, int maxID, int *currentBuffer, bool printTitle, bool printDetails, bool printContent, int64_t *currentNumPacketsRx){
     bool running = true;
 
     if(printTitle) {
@@ -1089,7 +1095,7 @@ void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, in
             //If there is a packet to print, print this brief status message
             setColor(BG_COLOR, FG_COLOR_START + numBuffers + 1, RESET); //Invert FG/BG for title
             for (int i = 0; i < numBuffers; i++) {
-                printf("Ch. %d Packet Rx-ed: %d\n", i, currentNumPacketsRx[i]);
+                printf("\nCh. %d Packet Rx: %ld\n", i, currentNumPacketsRx[i]);
             }
             setColor(FG_COLOR_DEFAULT, BG_COLOR, RESET);
         }
@@ -1101,7 +1107,7 @@ void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, in
         if(buffer->packetBufferOccupancy > 0){
             //There is a packet ready
             //This packet has the correct ID, print it
-            printPacketStruct(buffer->packetBuffer+(buffer->packetBufferReadInd), *currentBuffer, printTitle, printDetails, printContent);
+            printPacketStruct(buffer->packetBuffer+(buffer->packetBufferReadInd), *currentBuffer, false, printDetails, printContent);
             //Advance the read pointer, decrement occupency
             buffer->packetBufferOccupancy--;
             buffer->packetBufferReadInd = (buffer->packetBufferReadInd < buffer->packetBufferSize-1) ? buffer->packetBufferReadInd+1 : 0;

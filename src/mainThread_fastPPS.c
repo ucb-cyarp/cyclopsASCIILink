@@ -30,13 +30,15 @@ void* mainThread_fastPPS(void* argsUncast){
     char *txFeedbackFifoName = args->txFeedbackFifoName;
     char *rxFifoName = args->rxFifoName;
     double txDutyCycle = args->txDutyCycle;
-    int rxSubsamplePeriod = args->rxSubsamplePeriod;
+    int64_t rxSubsamplePeriod = args->rxSubsamplePeriod;
     int32_t txTokens = args->txTokens;
     int32_t maxBlocksToProcess = args->maxBlocksToProcess;
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
     int32_t fifoSize = args->fifoSize;
 	#endif
     TX_GAIN_DATATYPE gain = args->gain;
+
+    printf("Tx Duty Cycle: %f, Rx Subsample: %ld\n", txDutyCycle, rxSubsamplePeriod);
 
     //TODO: Make this an arg
     int numTxPktsToCreate = 128;
@@ -230,6 +232,8 @@ void* mainThread_fastPPS(void* argsUncast){
         fprintf(stderr, "Warning, requested duty cycle of %f could not be achieved.  Using a duty cycle of %f instead.\n", txDutyCycle, actualDutyCycle);
     }
 
+    printf("Pkt Len (Symbols): %d, Blank Len (Symbols): %d\n", txPacketLen, pktBlankPadding+extraBlanksRequiredRounded);
+
     //Tx State
     int txIndex = 0; //The current symbol to be transmitted in the packet.  Setting to 0 since we already selected packets to send
     time_t lastTxStartTime = time(NULL); //Will transmit after an initial gap
@@ -260,17 +264,17 @@ void* mainThread_fastPPS(void* argsUncast){
     int currentBuffer = 0;
     int failureCount = 0;
 
-    int pktRxCounter_ch0 = 0;
+    int64_t pktRxCounter_ch0 = 0;
     #ifdef MULTI_CH
-        int pktRxCounter_ch1 = 0;
-        int pktRxCounter_ch2 = 0;
-        int pktRxCounter_ch3 = 0;
+        int64_t pktRxCounter_ch1 = 0;
+        int64_t pktRxCounter_ch2 = 0;
+        int64_t pktRxCounter_ch3 = 0;
     #endif
 
     #ifdef MULTI_CH
-    int pktRxCounterTotal[4] = {0, 0, 0, 0};
+    int64_t pktRxCounterTotal[4] = {0, 0, 0, 0};
     #else
-    int pktRxCounterTotal[1] = {0};
+    int64_t pktRxCounterTotal[1] = {0};
 
     #endif
 
@@ -548,9 +552,9 @@ void* mainThread_fastPPS(void* argsUncast){
 
             int filteredElements_ch0  = repackRxDataEveryNth(rxPackedDataFiltered_ch0, rxPackedLastFiltered_ch0, rxPackedData_ch0, rxPackedLast_ch0, rxPackedValid_ch0, rawElementsRead, &remainingPacked_ch0, &remainingLast_ch0, &remainingBits_ch0, &phaseCounter_ch0, &pktRxCounter_ch0, pktRxCounterTotal+0, rxSubsamplePeriod);
             #ifdef MULTI_CH
-            int filteredElements_ch1  = repackRxDataEveryNth(rxPackedDataFiltered_ch1, rxPackedLastFiltered_ch1, rxPackedData_ch1, rxPackedLast_ch1, rxPackedValid_ch1, rawElementsRead, &remainingPacked_ch1, &remainingLast_ch1, &remainingBits_ch1, &phaseCounter_ch1, &pktRxCounter_ch0, pktRxCounterTotal+0, rxSubsamplePeriod);
-            int filteredElements_ch2  = repackRxDataEveryNth(rxPackedDataFiltered_ch2, rxPackedLastFiltered_ch2, rxPackedData_ch2, rxPackedLast_ch2, rxPackedValid_ch2, rawElementsRead, &remainingPacked_ch2, &remainingLast_ch2, &remainingBits_ch2, &phaseCounter_ch2, &pktRxCounter_ch1, pktRxCounterTotal+1, rxSubsamplePeriod);
-            int filteredElements_ch3  = repackRxDataEveryNth(rxPackedDataFiltered_ch3, rxPackedLastFiltered_ch3, rxPackedData_ch3, rxPackedLast_ch3, rxPackedValid_ch3, rawElementsRead, &remainingPacked_ch3, &remainingLast_ch3, &remainingBits_ch3, &phaseCounter_ch3, &pktRxCounter_ch2, pktRxCounterTotal+2, rxSubsamplePeriod);
+            int filteredElements_ch1  = repackRxDataEveryNth(rxPackedDataFiltered_ch1, rxPackedLastFiltered_ch1, rxPackedData_ch1, rxPackedLast_ch1, rxPackedValid_ch1, rawElementsRead, &remainingPacked_ch1, &remainingLast_ch1, &remainingBits_ch1, &phaseCounter_ch1, &pktRxCounter_ch1, pktRxCounterTotal+0, rxSubsamplePeriod);
+            int filteredElements_ch2  = repackRxDataEveryNth(rxPackedDataFiltered_ch2, rxPackedLastFiltered_ch2, rxPackedData_ch2, rxPackedLast_ch2, rxPackedValid_ch2, rawElementsRead, &remainingPacked_ch2, &remainingLast_ch2, &remainingBits_ch2, &phaseCounter_ch2, &pktRxCounter_ch2, pktRxCounterTotal+1, rxSubsamplePeriod);
+            int filteredElements_ch3  = repackRxDataEveryNth(rxPackedDataFiltered_ch3, rxPackedLastFiltered_ch3, rxPackedData_ch3, rxPackedLast_ch3, rxPackedValid_ch3, rawElementsRead, &remainingPacked_ch3, &remainingLast_ch3, &remainingBits_ch3, &phaseCounter_ch3, &pktRxCounter_ch3, pktRxCounterTotal+2, rxSubsamplePeriod);
             #endif
 
             // if(filteredElements_ch0>0){

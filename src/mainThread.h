@@ -22,7 +22,7 @@ int32_t maxBlocksToProcess;
 int32_t fifoSize; //Size in blocks
 #endif
 double txDutyCycle;
-int rxSubsamplePeriod;
+int64_t rxSubsamplePeriod;
 TX_GAIN_DATATYPE gain;
 } threadArgs_t;
 

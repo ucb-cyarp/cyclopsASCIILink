@@ -22,6 +22,8 @@ void printHelp(){
     printf("-tx: Path to the Tx Pipe\n");
     printf("-txfb: Path to the Tx Feedback Pipe (required if -tx is present)\n");
     printf("-txperiod: The period (in seconds) between packet transmission\n");
+    printf("-txdutycycle: The duty cycle of packet transmission (cannot be combined with -txdutycycle)\n");
+    printf("-rxsubsampleperiod: Print every nth packet when used with -txdutycycle\n");
     printf("-txtokens: The number of initial Tx tokens (in blocks).  Tokens are replenished via the feedback pipe\n");
     printf("-processlimit: The maximum number of blocks to process at one time\n");
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
@@ -38,7 +40,7 @@ int main(int argc, char **argv) {
 
     double txPeriod = 1.0;
     double txDutyCycle = 0.5;
-    int rxSubsamplePeriod = 200000;
+    int64_t rxSubsamplePeriod = 200000;
     int32_t txTokens = 500;
     int32_t maxBlocksToProcess = 10;
 	#ifdef CYCLOPS_ASCII_SHARED_MEM

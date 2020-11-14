@@ -178,7 +178,7 @@ int filterRepackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE
 
 int repackRxData(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits, int *phaseCounter);
 
-int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits, int *phaseCounter, int *pktRxCounter, int *pktRxCounterTotal, int processOneInN);
+int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATYPE* resultPackedLast, const RX_PACKED_DATATYPE* rawPacked, const RX_PACKED_LAST_DATATYPE* rawPackedLast, const RX_PACKED_VALID_DATATYPE* rawValid, int rawLen, RX_PACKED_DATATYPE *remainingPacked, RX_PACKED_LAST_DATATYPE *remainingLast, int *remainingBits, int *phaseCounter, int64_t *pktRxCounter, int64_t *pktRxCounterTotal, int64_t processOneInN);
 
 int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulationBuf, uint64_t val, uint8_t bitsPerVal, uint8_t bitsPerSymbol, uint8_t symbolRepitions);
 
@@ -191,6 +191,6 @@ void printPacketStruct(rx_packet_t* packet, int ch, bool printTitle, bool printD
 
 void processPackets(packet_buffer_state_t** buffers, int numBuffers, int* currentID, int maxID, int *currentBuffer, int *failureCount, int maxFailures, bool printTitle, bool printDetails, bool printContent);
 
-void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, int maxID, int *currentBuffer, bool printTitle, bool printDetails, bool printContent, int *currentNumPacketsRx);
+void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, int maxID, int *currentBuffer, bool printTitle, bool printDetails, bool printContent, int64_t *currentNumPacketsRx);
 
 #endif //CYCLOPSASCIILINK_CYCLOPSFRAMING_H
