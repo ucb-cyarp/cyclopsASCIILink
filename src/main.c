@@ -13,7 +13,7 @@
 #include "mainThread.h"
 
 void printHelp(){
-    printf("cyclopsASCIILink <-rx rx.pipe> <-tx tx.pipe <-txfb tx_feedback.pipe> <-txperiod 1.0> <-txdutycycle 0.5> <-rxsubsampleperiod 200000> <-txtokens 500> <-processlimit 10>\n");
+    printf("cyclopsASCIILink <-rx rx.pipe> <-tx tx.pipe <-txfb tx_feedback.pipe> <-txperiod 1.0> <-txdutycycle 0.5> <-rxsubsampleperiod 200000> <-txtokens 500> <-processlimit 10> <-maxblocksinflight 10000>\n");
     printf("\n");
     printf("The application will default to using the txperiod unless a duty cycle or subsampling period are specified\n");
     printf("\n");
@@ -26,6 +26,7 @@ void printHelp(){
     printf("-rxsubsampleperiod: Print every nth packet when used with -txdutycycle\n");
     printf("-txtokens: The number of initial Tx tokens (in blocks).  Tokens are replenished via the feedback pipe\n");
     printf("-processlimit: The maximum number of blocks to process at one time\n");
+    printf("-maxblocksinflight: The maximum number of blocks allowed to be in flight between the Tx and Rx (May potentially have an additional txTokens-1 in flight) (<= 0 disables check).  Similar to -txtokens except that this extends completely from the Tx to the Rx\n");
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
 	printf("-fifosize: The size of the FIFO in blocks\n");
 	#endif
@@ -42,6 +43,7 @@ int main(int argc, char **argv) {
     double txDutyCycle = 0.5;
     int64_t rxSubsamplePeriod = 200000;
     int32_t txTokens = 500;
+    int32_t maxBlocksInFlight = -1;
     int32_t maxBlocksToProcess = 10;
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
     	int32_t fifoSize = 8;
@@ -207,6 +209,20 @@ int main(int argc, char **argv) {
                 printf("Missing argument for -processlimit\n");
                 exit(1);
             }
+        }else if(strcmp("-maxblocksinflight", argv[i]) == 0) {
+            i++; //Get the actual argument
+
+            if (!TX_AVAILABLE) {
+                printf("Tx is unavailable in current configuration\n");
+                exit(1);
+            }
+
+            if (i < argc) {
+                maxBlocksInFlight = strtol(argv[i], NULL, 10);
+            } else {
+                printf("Missing argument for -maxblocksinflight\n");
+                exit(1);
+            }
         }else if(strcmp("-cpu", argv[i]) == 0) {
             i++; //Get the actual argument
 
@@ -243,6 +259,7 @@ int main(int argc, char **argv) {
 
     threadArgs.txPeriod=txPeriod;
     threadArgs.txTokens=txTokens;
+    threadArgs.maxBlocksInFlight=maxBlocksInFlight;
     threadArgs.maxBlocksToProcess=maxBlocksToProcess;
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
     	threadArgs.fifoSize=fifoSize;

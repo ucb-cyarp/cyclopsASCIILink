@@ -17,6 +17,7 @@ char *rxFifoName;
 
 double txPeriod;
 int32_t txTokens;
+int32_t maxBlocksInFlight;
 int32_t maxBlocksToProcess;
 #ifdef CYCLOPS_ASCII_SHARED_MEM
 int32_t fifoSize; //Size in blocks

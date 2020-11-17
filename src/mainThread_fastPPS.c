@@ -33,6 +33,7 @@ void* mainThread_fastPPS(void* argsUncast){
     int64_t rxSubsamplePeriod = args->rxSubsamplePeriod;
     int32_t txTokens = args->txTokens;
     int32_t maxBlocksToProcess = args->maxBlocksToProcess;
+    int32_t maxBlocksInFlight = args->maxBlocksInFlight;
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
     int32_t fifoSize = args->fifoSize;
 	#endif
@@ -314,13 +315,20 @@ void* mainThread_fastPPS(void* argsUncast){
 
     int blankCount = 0;
 
+    int outstandingBal = 0;
+
     //Main Loop
     bool running = true;
     while(running){
         //==== Tx ====
         if(txFifoName!=NULL){
             //If transmissions are OK (we have Tx tokens from flow control)
-            if(txTokens > 0) {
+            bool blocksInFlightTxOk = true;
+            if(maxBlocksInFlight>0){
+                blocksInFlightTxOk = outstandingBal < maxBlocksInFlight;
+            }
+
+            if(txTokens > 0 && blocksInFlightTxOk) {
                 //Check if we are already sending a packet, are sending blanks
                 //Will select new packets to send after finishing sending blanks
                 if(txIndex<txPacketLen){
@@ -359,6 +367,7 @@ void* mainThread_fastPPS(void* argsUncast){
                     #endif
 					txIndex += sendStatus.elementsSent;
 					blankCount += sendStatus.blanksSent;
+                    outstandingBal += sendStatus.elementsSent/TX_BLOCK_SIZE + sendStatus.blanksSent/TX_BLOCK_SIZE;
                 }else{
                     //We are done sending the packet
 
@@ -368,13 +377,16 @@ void* mainThread_fastPPS(void* argsUncast){
                         int blanksToRequest = extraBlanksRequiredRounded-blankCount;
 
                         #ifdef CYCLOPS_ASCII_SHARED_MEM
-                        blankCount += sendBlank(&txFifo,
+                        int blanksSent = sendBlank(&txFifo,
                         #else
-                        blankCount += sendBlank(txFifo,
+                        int blanksSent = sendBlank(txFifo,
                         #endif
                                                 blanksToRequest,
                                                 maxBlocksToProcess < txTokens ? maxBlocksToProcess : txTokens,
                                                 &txTokens);
+
+                        blankCount += blanksSent;
+                        outstandingBal += blanksSent/TX_BLOCK_SIZE;
                     }
 
                     //Check if after sending blanks (if applicable) new packet(s) need to be chosen
@@ -513,6 +525,8 @@ void* mainThread_fastPPS(void* argsUncast){
                                            rxPackedLast_ch0, 
                                            maxBlocksToProcess, &isDoneReading);
             #endif
+
+            outstandingBal -= rawElementsRead/RX_BLOCK_SIZE;
 
             if(isDoneReading){
                 //done reading

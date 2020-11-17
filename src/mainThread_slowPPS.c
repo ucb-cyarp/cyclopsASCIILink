@@ -31,6 +31,7 @@ void* mainThread_slowPPS(void* argsUncast){
     double txPeriod = args->txPeriod;
     int32_t txTokens = args->txTokens;
     int32_t maxBlocksToProcess = args->maxBlocksToProcess;
+    int32_t maxBlocksInFlight = args->maxBlocksInFlight;
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
     int32_t fifoSize = args->fifoSize;
 	#endif
@@ -215,13 +216,21 @@ void* mainThread_slowPPS(void* argsUncast){
     int phaseCounter_ch3 = 0;
     #endif
 
+    int outstandingBal = 0;
+
     //Main Loop
     bool running = true;
     while(running){
         //==== Tx ====
         if(txFifoName!=NULL){
             //If transmissions are OK
-            if(txTokens > 0) {
+
+            bool blocksInFlightTxOk = true;
+            if(maxBlocksInFlight>0){
+                blocksInFlightTxOk = outstandingBal < maxBlocksInFlight;
+            }
+
+            if(txTokens > 0 && blocksInFlightTxOk) {
                 //Check if OK to send
 
                 if(txIndex<txPacketLen_ch0){
@@ -260,6 +269,7 @@ void* mainThread_slowPPS(void* argsUncast){
                                             &txTokens);
                     #endif
 					txIndex += sendStatus.elementsSent;
+                    outstandingBal += sendStatus.elementsSent/TX_BLOCK_SIZE + sendStatus.blanksSent/TX_BLOCK_SIZE;
                 }else{
                     //Should we be sending
                     time_t currentTime = time(NULL);
@@ -343,6 +353,7 @@ void* mainThread_slowPPS(void* argsUncast){
                                             &txTokens);
                         #endif
 						txIndex += sendStatus.elementsSent;
+                        outstandingBal += sendStatus.elementsSent/TX_BLOCK_SIZE + sendStatus.blanksSent/TX_BLOCK_SIZE;
                     }else{
                         //Write 0's
                         //TODO: Change to a more optimized solution
@@ -377,6 +388,7 @@ void* mainThread_slowPPS(void* argsUncast){
                                 &txTokens);
                         #endif
                         txIndex += sendStatus.elementsSent;
+                        outstandingBal += sendStatus.elementsSent/TX_BLOCK_SIZE + sendStatus.blanksSent/TX_BLOCK_SIZE;
                     }
                 }
             }
@@ -488,6 +500,9 @@ void* mainThread_slowPPS(void* argsUncast){
                                            rxPackedLast_ch0, 
                                            maxBlocksToProcess, &isDoneReading);
             #endif
+
+            outstandingBal -= rawElementsRead/RX_BLOCK_SIZE;
+
 
             if(isDoneReading){
                 //done reading
