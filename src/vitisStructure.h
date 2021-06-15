@@ -67,7 +67,7 @@
 
 // ++ Receiver ++
 #define RX_AVAILABLE true
-#define RX_PACKED_BITS 4 //There are 4 bits per packed
+#define RX_PACKED_BITS 8 //There are 8 bits per packed
 
 #define RX_BLOCK_SIZE RX_DEMO_OUTPUT_BUNDLE1_BLOCKSIZE
 #define RX_STRUCTURE_TYPE_NAME rx_demo_outputs_bundle_1_t

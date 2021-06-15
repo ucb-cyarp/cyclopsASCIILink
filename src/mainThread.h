@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include "cyclopsFraming.h"
 
-#define BITS_PER_SYMBOL_PAYLOAD_TX 4 //This changes the transmitted modulation between BPSK=1, QPSK=2, and 16QAM=4
+#define BITS_PER_SYMBOL_PAYLOAD_TX 8 //This changes the transmitted modulation between BPSK=1, QPSK=2, 16QAM=4, 256QAM=8
 
 typedef struct{
 char *txFifoName;

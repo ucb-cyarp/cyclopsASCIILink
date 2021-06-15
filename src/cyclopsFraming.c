@@ -188,6 +188,9 @@ int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulati
         case 4:
             modType = MOD_TYPE_QAM16;
             break;
+        case 8:
+            modType = MOD_TYPE_QAM256;
+            break;
         default:
             modType = MOD_TYPE_BPSK;
             break;
@@ -211,6 +214,7 @@ int createRawASCIIPayload(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
     int arrayIndex = 0;
     bool foundEndOfStr = false;
 
+    bool qam256PaddingFlip = false;
     while(msgIndex<payloadLenBytes){
         if(!foundEndOfStr){
             if(message[msgIndex] == '\0'){
@@ -231,6 +235,10 @@ int createRawASCIIPayload(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
                     break;
                 case 4:
                     paddingByte = PADDING_BYTE_QAM16;
+                    break;
+                case 8:
+                    paddingByte = qam256PaddingFlip ? PADDING_BYTE1_QAM256 : PADDING_BYTE2_QAM256;
+                    qam256PaddingFlip = !qam256PaddingFlip;
                     break;
                 default:
                     paddingByte = PADDING_BYTE_BPSK;
@@ -297,6 +305,10 @@ int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
         case 4:
             modType = MOD_TYPE_QAM16;
             msgLen = QAM16_PAYLOAD_LEN_BYTES;
+            break;
+        case 8:
+            modType = MOD_TYPE_QAM256;
+            msgLen = QAM256_PAYLOAD_LEN_BYTES;
             break;
         default:
             modType = MOD_TYPE_BPSK;
@@ -585,6 +597,9 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                         case MOD_TYPE_QAM16:
                             modLabel = "16QAM";
                             break;
+                        case MOD_TYPE_QAM256:
+                            modLabel = "256QAM";
+                            break;
                         default:
                             modLabel = "UNKNOWN";
                             break;
@@ -606,8 +621,11 @@ void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                     case MOD_TYPE_QAM16:
                         maxLen = QAM16_PAYLOAD_LEN_BYTES;
                         break;
+                    case MOD_TYPE_QAM256:
+                        maxLen = QAM256_PAYLOAD_LEN_BYTES;
+                        break;
                     default:
-                        maxLen = QAM16_PAYLOAD_LEN_BYTES;
+                        maxLen = MAX_PAYLOAD_LEN;
                         break;
                 }
 
@@ -802,8 +820,11 @@ void parsePacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                     case MOD_TYPE_QAM16:
                         maxLen = QAM16_PAYLOAD_LEN_BYTES;
                         break;
+                    case MOD_TYPE_QAM256:
+                        maxLen = QAM256_PAYLOAD_LEN_BYTES;
+                        break;
                     default:
-                        maxLen = QAM16_PAYLOAD_LEN_BYTES;
+                        maxLen = MAX_PAYLOAD_LEN;
                         break;
                 }
 
@@ -952,6 +973,9 @@ void printPacketStruct(rx_packet_t* packet, int ch, bool printTitle, bool printD
                 break;
             case MOD_TYPE_QAM16:
                 modLabel = "16QAM";
+                break;
+            case MOD_TYPE_QAM256:
+                modLabel = "256QAM";
                 break;
             default:
                 modLabel = "UNKNOWN";
