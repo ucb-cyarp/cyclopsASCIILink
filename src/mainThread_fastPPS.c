@@ -366,7 +366,7 @@ void* mainThread_fastPPS(void* argsUncast){
                                             &txTokens);
                     #endif
 					txIndex += sendStatus.elementsSent;
-					blankCount += sendStatus.blanksSent;
+					// blankCount += sendStatus.blanksSent; //Do not count these.  We only track the extra blanks needed
                     outstandingBal += sendStatus.elementsSent/TX_BLOCK_SIZE + sendStatus.blanksSent/TX_BLOCK_SIZE;
                 }else{
                     //We are done sending the packet
