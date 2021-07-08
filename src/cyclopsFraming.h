@@ -72,6 +72,8 @@
 #define FG_COLOR_DEFAULT BLACK
 #define FG_COLOR_START RED
 
+#define SANITIZE_PRINT_ASCII (true)
+
 void setColor(int fg_color, int bg_color, int mode);
 
 extern const uint8_t cyclopsPreambleSymbols[];
@@ -83,7 +85,7 @@ typedef struct{
     uint8_t modMode; //The modulation type of this packet
     uint8_t packetType; //The type of packet
     int rxCount; //The reception number of this packet
-    char data[MAX_PAYLOAD_PLUS_CRC_LEN]; //A byte array to store the packet.  This is sized for the max size packet
+    unsigned char data[MAX_PAYLOAD_PLUS_CRC_LEN]; //A byte array to store the packet.  This is sized for the max size packet
 } rx_packet_t; //This is used for Rx packets
 
 typedef struct{
@@ -161,7 +163,7 @@ int createRawPreamble(TX_SYMBOL_DATATYPE *rawPreambleBuf, TX_MODTYPE_DATATYPE *p
 
 int createRawHeader(TX_SYMBOL_DATATYPE *rawHeaderBuf, TX_MODTYPE_DATATYPE *headerModulationBuf, uint8_t modType, uint8_t type, uint8_t src, uint8_t dst, uint16_t netID, uint16_t length);
 
-int createRawASCIIPayload(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, const char* message, uint16_t payloadLenBytes, uint16_t bitsPerSymbol, int* msgBytesRead);
+int createRawASCIIPayload(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, const char* message, const unsigned char* scramblerStream, uint16_t payloadLenBytes, uint16_t bitsPerSymbol, int* msgBytesRead);
 
 //TODO: Implement CRC.  For now, just adds padding
 int createCRC(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, uint16_t bitsPerSymbol);
@@ -172,7 +174,7 @@ int createCRC(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuf
 //NOTE: The message should be null terminated
 //The arrays must be pre-allocated
 //Returns the packet length in symbols
-int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, uint8_t src, uint8_t dst, uint16_t netID, int bitsPerPayloadSymbol, const char* message, int* msgBytesRead);
+int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, uint8_t src, uint8_t dst, uint16_t netID, int bitsPerPayloadSymbol, const char* message, int* msgBytesRead, const unsigned char* scramblerStream);
 
 //Note: We can read directly from the packed data stream once filtering for valid and strobe andf repacking
 //Sanitized for printable characters
@@ -186,15 +188,32 @@ int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATY
 
 int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulationBuf, uint64_t val, uint8_t bitsPerVal, uint8_t bitsPerSymbol, uint8_t symbolRepitions);
 
-//The latter pointers are used to carry state between calls in case the header is in the middle of being parsed between 2 calls to the function.  Byte in packet is used to track if the
-void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, int* byteInPacket, uint8_t* modMode, uint8_t* type, uint8_t* src, uint8_t* dst, int16_t *netID, int16_t *length, bool printDetails, int* rxCount);
-
+/**
+ * Used to parse a recieved packet into the recieved packet structure.
+ * 
+ * Note: This function does not de-scramble the payload.  That is accomplished by descramblePacket
+ * 
+ * Note: This function does not sanitize the payload of non-printable ASCII characters.  That is done in printPacketStruct
+ */
 void parsePacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, rx_decoder_state_t *decoderState, packet_buffer_state_t* packetBufferState);
 
+/**
+ * Descrambles the packet payload
+ */
+void descramblePacket(rx_packet_t* packet, const unsigned char* scramblerStream);
+
+/**
+ * Prints the packet structure including the packet contents (if enabled).
+ * 
+ * If printing the contents of the packet, the contents are de-scrambled.
+ * 
+ * Also sanitizes non-printable characters in the payload for output to the console.
+ * Non-printable characters are replaced with '^'.
+ */
 void printPacketStruct(rx_packet_t* packet, int ch, bool printTitle, bool printDetails, bool printContent);
 
-void processPackets(packet_buffer_state_t** buffers, int numBuffers, int* currentID, int maxID, int *currentBuffer, int *failureCount, int maxFailures, bool printTitle, bool printDetails, bool printContent);
+void processPackets(packet_buffer_state_t** buffers, const unsigned char* scramblerStream, int numBuffers, int* currentID, int maxID, int *currentBuffer, int *failureCount, int maxFailures, bool printTitle, bool printDetails, bool printContent);
 
-void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, int maxID, int *currentBuffer, bool printTitle, bool printDetails, bool printContent, int64_t *currentNumPacketsRx);
+void processPacketsNoIDCheck(packet_buffer_state_t** buffers, const unsigned char* scramblerStream, int numBuffers, int maxID, int *currentBuffer, bool printTitle, bool printDetails, bool printContent, int64_t *currentNumPacketsRx);
 
 #endif //CYCLOPSASCIILINK_CYCLOPSFRAMING_H

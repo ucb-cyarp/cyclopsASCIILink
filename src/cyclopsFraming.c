@@ -197,7 +197,7 @@ int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulati
     }
 
     for(int i = 0; i<symbolsPerVal; i++) {
-        int64_t symbol = val & valMask;
+        uint64_t symbol = val & valMask;
         val = val >> bitsPerSymbol;
         for (int j = 0; j < symbolRepetitions; j++) {
             symbolBuf[i*symbolRepetitions+j] = (TX_SYMBOL_DATATYPE) symbol;
@@ -208,7 +208,7 @@ int unpackToSymbols(TX_SYMBOL_DATATYPE *symbolBuf, TX_MODTYPE_DATATYPE *modulati
     return symbolsPerVal*symbolRepetitions;
 }
 
-int createRawASCIIPayload(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, const char* message, uint16_t payloadLenBytes, uint16_t bitsPerSymbol, int* msgBytesRead){
+int createRawASCIIPayload(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, const char* message, const unsigned char* scramblerStream, uint16_t payloadLenBytes, uint16_t bitsPerSymbol, int* msgBytesRead){
     int msgIndex = 0;
     int msgBytesReadLocal = -1;
     int arrayIndex = 0;
@@ -244,9 +244,12 @@ int createRawASCIIPayload(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
                     paddingByte = PADDING_BYTE_BPSK;
                     break;
             }
-            arrayIndex += unpackToSymbols(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, paddingByte, sizeof(*message)*8, bitsPerSymbol, TX_REPITIONS_PER_SYMBOL);
+            unsigned char scrambledByte = paddingByte ^ scramblerStream[msgIndex];
+            arrayIndex += unpackToSymbols(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, scrambledByte, sizeof(*message)*8, bitsPerSymbol, TX_REPITIONS_PER_SYMBOL);
         }else{
-            arrayIndex += unpackToSymbols(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, message[msgIndex], sizeof(*message)*8, bitsPerSymbol, TX_REPITIONS_PER_SYMBOL);
+            const unsigned char* messageUnsigned = (const unsigned char*) message;
+            unsigned char scrambledByte = messageUnsigned[msgIndex] ^ scramblerStream[msgIndex];
+            arrayIndex += unpackToSymbols(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, scrambledByte, sizeof(*message)*8, bitsPerSymbol, TX_REPITIONS_PER_SYMBOL);
         }
 
         msgIndex++;
@@ -288,7 +291,7 @@ int createCRC(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuf
     return arrayIndex;
 }
 
-int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, uint8_t src, uint8_t dst, uint16_t netID, int bitsPerPayloadSymbol, const char* message, int* msgBytesRead){
+int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE *modeModeBuffer, uint8_t src, uint8_t dst, uint16_t netID, int bitsPerPayloadSymbol, const char* message, int* msgBytesRead, const unsigned char* scramblerStream){
     int arrayIndex = 0;
 
     int modType;
@@ -326,7 +329,7 @@ int createRawCyclopsFrame(TX_SYMBOL_DATATYPE *packetBuffer, TX_MODTYPE_DATATYPE 
 
     //Payload
     // printf("Index: %d\n", arrayIndex);
-    arrayIndex += createRawASCIIPayload(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, message, msgLen, bitsPerPayloadSymbol, msgBytesRead);
+    arrayIndex += createRawASCIIPayload(packetBuffer+arrayIndex, modeModeBuffer+arrayIndex, message, scramblerStream, msgLen, bitsPerPayloadSymbol, msgBytesRead);
 
     //CRC
     // printf("Index: %d\n", arrayIndex);
@@ -529,207 +532,7 @@ int repackRxDataEveryNth(RX_PACKED_DATATYPE* resultPacked, RX_PACKED_LAST_DATATY
     return dstInd;
 }
 
-void printPacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, int* byteInPacket, uint8_t* modMode, uint8_t* type, uint8_t* src, uint8_t *dst, int16_t *netID, int16_t *length, bool printDetails, int *rxCount){
-    static_assert((HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8)%sizeof(*packedFiltered) == 0, "For now, header must be a multiple of the size of RX_PACKED_DATATYPE");
-    static_assert(BPSK_PAYLOAD_LEN_BYTES%sizeof(*packedFiltered) == 0, "For now, BPSK packet length must be a multiple of the size of RX_PACKED_DATATYPE");
-    static_assert(QPSK_PAYLOAD_LEN_BYTES%sizeof(*packedFiltered) == 0, "For now, QPSK packet length must be a multiple of the size of RX_PACKED_DATATYPE");
-    static_assert(QAM16_PAYLOAD_LEN_BYTES%sizeof(*packedFiltered) == 0, "For now, 16QAM packet length must be a multiple of the size of RX_PACKED_DATATYPE");
-    static_assert(CRC_BYTES_LEN%sizeof(*packedFiltered) == 0, "For now, CRC Checksum length must be a multiple of the size of RX_PACKED_DATATYPE");
-
-    int bytesPerPacked = sizeof(*packedFiltered);
-    int packetFilteredByteLen = packedFilteredLen*bytesPerPacked;
-
-    int byteInPacketLocal = *byteInPacket;
-    uint8_t *packetFilteredBytes = (uint8_t*) packedFiltered;
-    uint8_t *netIDBytes = (uint8_t*) netID;
-    uint8_t *lengthBytes = (uint8_t*) length;
-
-    int packedByteInd = 0;
-
-    while(packedByteInd<packetFilteredByteLen) {
-
-        if(byteInPacketLocal<(HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8)) {
-            //Parsing the header
-            //We do this 1 byte at a time.
-            switch(byteInPacketLocal){
-                case 0:
-                    *modMode = packetFilteredBytes[packedByteInd];
-                    break;
-                case 1:
-                    *type = packetFilteredBytes[packedByteInd];
-                    break;
-                case 2:
-                    *src = packetFilteredBytes[packedByteInd];
-                    break;
-                case 3:
-                    *dst = packetFilteredBytes[packedByteInd];
-                    break;
-                case 4:
-                    netIDBytes[0] = packetFilteredBytes[packedByteInd];
-                    break;
-                case 5:
-                    netIDBytes[1] = packetFilteredBytes[packedByteInd];
-                    break;
-                case 6:
-                    lengthBytes[0] = packetFilteredBytes[packedByteInd];
-                    break;
-                case 7:
-                    lengthBytes[1] = packetFilteredBytes[packedByteInd];
-                    break;
-                default:
-                    //Should never get here
-                    printf("Parsing Error\n");
-                    exit(1);
-            }
-
-            if(byteInPacketLocal==7){
-                (*rxCount)++;
-                printf("Packet Rx: #%d\n", *rxCount);
-                if(printDetails){
-                    char *modLabel;
-                    switch(*modMode){
-                        case MOD_TYPE_BPSK:
-                            modLabel = "BPSK";
-                            break;
-                        case MOD_TYPE_QPSK:
-                            modLabel = "QPSK";
-                            break;
-                        case MOD_TYPE_QAM16:
-                            modLabel = "16QAM";
-                            break;
-                        case MOD_TYPE_QAM256:
-                            modLabel = "256QAM";
-                            break;
-                        default:
-                            modLabel = "UNKNOWN";
-                            break;
-                    }
-
-                    printf("Modulation Type = %s, Type = %d, Src = %d, Dst = %d, NET_ID = %d, LENGTH = %d\n", modLabel, *type, *src, *dst, *netID, *length);
-                }
-
-                int maxLen;
-                bool lenError = false;
-
-                switch(*modMode){
-                    case MOD_TYPE_BPSK:
-                        maxLen = BPSK_PAYLOAD_LEN_BYTES;
-                        break;
-                    case MOD_TYPE_QPSK:
-                        maxLen = QPSK_PAYLOAD_LEN_BYTES;
-                        break;
-                    case MOD_TYPE_QAM16:
-                        maxLen = QAM16_PAYLOAD_LEN_BYTES;
-                        break;
-                    case MOD_TYPE_QAM256:
-                        maxLen = QAM256_PAYLOAD_LEN_BYTES;
-                        break;
-                    default:
-                        maxLen = MAX_PAYLOAD_LEN;
-                        break;
-                }
-
-                if(*length > maxLen){
-                    *length = maxLen;
-                    lenError = true;
-                }
-
-                if(printDetails && lenError){
-                    printf("Length Error\n");
-
-                }
-            }
-            byteInPacketLocal++;
-            packedByteInd++;
-        }else if(byteInPacketLocal < *length){
-            //TODO: Relies on header being a multiple of the packed length
-
-            int packedInd = packedByteInd/bytesPerPacked;
-
-            int packedIndInPayload = byteInPacketLocal/bytesPerPacked - HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8/bytesPerPacked;
-            int remainingPacked = (*length+(*length)%bytesPerPacked)/bytesPerPacked - packedIndInPayload;
-            int maxPackedInd = packedInd+remainingPacked;
-            if(maxPackedInd > packedFilteredLen){
-                maxPackedInd = packedFilteredLen;
-            }
-
-            int lastInd = -1;
-            for(int i = packedInd; i<maxPackedInd; i++){
-                if(packedFilteredLast[i]){
-                    lastInd = i;
-                    break;
-                }
-            }
-
-            //Print the payload
-            if(lastInd < 0){
-                //Did not find a last, print up to (but not including) the maxPacketInd
-                int maxByteInd = maxPackedInd*bytesPerPacked;
-                int byteLen = maxByteInd-packedByteInd;
-                char* printStart = packetFilteredBytes+packedByteInd;
-                for(int i = 0; i<byteLen; i++){//Sanitize
-                    if(!isprint(printStart[i]) && printStart[i]!='\n'){
-                        printStart[i] = '^';
-                    }
-                }
-                fwrite(printStart, sizeof(char), byteLen, stdout);
-                byteInPacketLocal += byteLen;
-                packedByteInd += byteLen;
-            }else{
-                //print up to (including) the last point then set byteInPacketLocal back to 0
-                int maxByteInd = (lastInd+1)*bytesPerPacked;
-                int byteLen = maxByteInd-packedByteInd;
-                char* printStart = packetFilteredBytes+packedByteInd;
-                for(int i = 0; i<byteLen; i++){//Sanitize
-                    if(!isprint(printStart[i]) && printStart[i]!='\n'){
-                        printStart[i] = '^';
-                    }
-                }
-                fwrite(printStart, sizeof(char), byteLen, stdout);
-                printf("\n==== End of Packet ====\n");
-                byteInPacketLocal = 0;
-                packedByteInd += byteLen;
-            }
-        }else{
-            //should be the CRC.  Search until a last is found
-            int packedInd = packedByteInd/bytesPerPacked;
-
-            int lastInd = -1;
-            for(int i = packedInd; i<packedFilteredLen; i++){
-                if(packedFilteredLast[i]){
-                    lastInd = i;
-                    break;
-                }
-            }
-
-            if(lastInd < 0){
-                //Did not find a last
-                int maxByteInd = packedFilteredLen*bytesPerPacked;
-                int byteLen = maxByteInd-packedByteInd;
-
-                byteInPacketLocal += byteLen;
-                packedByteInd += byteLen;
-            }else{
-                //Found last!  Reset for the next packet
-                printf("\n==== End of Packet ====\n");
-                int maxByteInd = (lastInd+1)*bytesPerPacked;
-                int byteLen = maxByteInd-packedByteInd;
-                if(byteInPacketLocal+byteLen != HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8+(*length)+CRC_BYTES_LEN){
-                    printf("Unexpected Position of Last Flag: got %d, expected %d\n", byteInPacketLocal+byteLen, HEADER_SYMBOL_LEN*BITS_PER_SYMBOL_HEADER/8+(*length)+CRC_BYTES_LEN);
-                }
-
-                byteInPacketLocal = 0;
-                packedByteInd += byteLen;
-            }
-        }
-        //Print until length or last is reached
-    }
-
-    *byteInPacket = byteInPacketLocal;
-}
-
 //TODO: Move
-
 
 void parsePacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_DATATYPE* packedFilteredLast, int packedFilteredLen, rx_decoder_state_t *decoderState,
                  packet_buffer_state_t* packetBufferState){ 
@@ -875,12 +678,7 @@ void parsePacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                 //Did not find a last, print up to (but not including) the maxPacketInd
                 int maxByteInd = maxPackedInd*bytesPerPacked;
                 int byteLen = maxByteInd-packedByteInd;
-                char* printStart = packetFilteredBytes+packedByteInd;
-                for(int i = 0; i<byteLen; i++){//Sanitize
-                    if(!isprint(printStart[i]) && printStart[i]!='\n'){
-                        printStart[i] = '^';
-                    }
-                }
+                unsigned char* printStart = packetFilteredBytes+packedByteInd;
 
                 memcpy(decoderState->currentPacket->data+decoderState->currentPacket->dataLen, printStart, byteLen);
                 decoderState->currentPacket->dataLen += byteLen;
@@ -891,13 +689,7 @@ void parsePacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
                 //print up to (including) the last point then set byteInPacketLocal back to 0
                 int maxByteInd = (lastInd+1)*bytesPerPacked;
                 int byteLen = maxByteInd-packedByteInd;
-                char* printStart = packetFilteredBytes+packedByteInd;
-
-                for(int i = 0; i<byteLen; i++){//Sanitize
-                    if(!isprint(printStart[i]) && printStart[i]!='\n'){
-                        printStart[i] = '^';
-                    }
-                }
+                unsigned char* printStart = packetFilteredBytes+packedByteInd;
 
                 memcpy(decoderState->currentPacket->data+decoderState->currentPacket->dataLen, printStart, byteLen);
                 decoderState->currentPacket->dataLen += byteLen;
@@ -957,6 +749,26 @@ void parsePacket(const RX_PACKED_DATATYPE* packedFiltered, const RX_PACKED_LAST_
     decoderState->byteInPacket = byteInPacketLocal;
 }
 
+void descramblePacket(rx_packet_t* packet, const unsigned char* scramblerStream){ 
+    int len = packet->dataLen;
+
+    if(packet->dataLen>MAX_PAYLOAD_PLUS_CRC_LEN){
+        len = MAX_PAYLOAD_PLUS_CRC_LEN;
+    }
+
+    //Unscramble
+    for(int i = 0; i<len; i++){
+        packet->data[i] = packet->data[i]^scramblerStream[i]; //Unscamble
+
+        //Sanitize non-printable characters
+        if(SANITIZE_PRINT_ASCII && !isprint(packet->data[i]) && packet->data[i] != '\n'){
+            //This is a non-printable character
+            //IMPORTANT: Do this after de-scrambling
+            packet->data[i] = '^';
+        }
+    }
+}
+
 void printPacketStruct(rx_packet_t* packet, int ch, bool printTitle, bool printDetails, bool printContent){
     if(printTitle){
         setColor(BG_COLOR, FG_COLOR_START+ch, RESET); //Invert FG/BG for title
@@ -988,7 +800,22 @@ void printPacketStruct(rx_packet_t* packet, int ch, bool printTitle, bool printD
 
     if(printContent){
         setColor(FG_COLOR_START+ch, BG_COLOR, RESET);
-        fwrite(packet->data, sizeof(char), packet->dataLen, stdout);
+        if(packet->dataLen<=MAX_PAYLOAD_PLUS_CRC_LEN){
+            //Unscramble
+            unsigned char data[packet->dataLen];
+            for(int i = 0; i<packet->dataLen; i++){
+                data[i] = packet->data[i];
+                //Sanitize non-printable characters
+                if(SANITIZE_PRINT_ASCII && !isprint(data[i]) && data[i]!='\n'){
+                    //This is a non-printable character
+                    //IMPORTANT: Do this after de-scrambling
+                    data[i] = '^';
+                }
+            }
+            fwrite(data, sizeof(unsigned char), packet->dataLen, stdout);
+        }else{
+            printf("!!!! Packet Reported Length Longer than Max Len !!!!\n");
+        }
     }
 
     if(printTitle){
@@ -1010,7 +837,7 @@ void setColor(int fg_color, int bg_color, int mode){
  * Current buffer is the buffer currently being watched
  * CurrentID is the ID we are currently looking for
  */
-void processPackets(packet_buffer_state_t** buffers, int numBuffers, int* currentID, int maxID, int *currentBuffer, int *failureCount, int maxFailures, bool printTitle, bool printDetails, bool printContent){
+void processPackets(packet_buffer_state_t** buffers, const unsigned char* scramblerStream, int numBuffers, int* currentID, int maxID, int *currentBuffer, int *failureCount, int maxFailures, bool printTitle, bool printDetails, bool printContent){
     bool running = true;
 
     while(running){
@@ -1020,7 +847,9 @@ void processPackets(packet_buffer_state_t** buffers, int numBuffers, int* curren
             //There is a packet ready
             //Check the ID
             if(buffer->packetBuffer[buffer->packetBufferReadInd].id == *currentID){
-                //This packet has the correct ID, print it
+                //This packet has the correct ID, descramble it
+                descramblePacket(buffer->packetBuffer+(buffer->packetBufferReadInd), scramblerStream);
+                //print it
                 printPacketStruct(buffer->packetBuffer+(buffer->packetBufferReadInd), *currentBuffer, printTitle, printDetails, printContent);
                 //Advance the read pointer, decrement occupency
                 buffer->packetBufferOccupancy--;
@@ -1104,7 +933,7 @@ void processPackets(packet_buffer_state_t** buffers, int numBuffers, int* curren
     }
 }
 
-void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, int maxID, int *currentBuffer, bool printTitle, bool printDetails, bool printContent, int64_t *currentNumPacketsRx){
+void processPacketsNoIDCheck(packet_buffer_state_t** buffers, const unsigned char* scramblerStream, int numBuffers, int maxID, int *currentBuffer, bool printTitle, bool printDetails, bool printContent, int64_t *currentNumPacketsRx){
     bool running = true;
 
     if(printTitle) {
@@ -1130,7 +959,9 @@ void processPacketsNoIDCheck(packet_buffer_state_t** buffers, int numBuffers, in
         packet_buffer_state_t* buffer = buffers[*currentBuffer];
         if(buffer->packetBufferOccupancy > 0){
             //There is a packet ready
-            //This packet has the correct ID, print it
+            //Descramble it
+            descramblePacket(buffer->packetBuffer+(buffer->packetBufferReadInd), scramblerStream);
+            //Print it
             printPacketStruct(buffer->packetBuffer+(buffer->packetBufferReadInd), *currentBuffer, false, printDetails, printContent);
             //Advance the read pointer, decrement occupency
             buffer->packetBufferOccupancy--;

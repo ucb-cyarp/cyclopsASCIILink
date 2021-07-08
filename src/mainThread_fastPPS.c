@@ -44,6 +44,7 @@ void* mainThread_fastPPS(void* argsUncast){
     //TODO: Make this an arg
     int numTxPktsToCreate = 128;
     int randSeed = 8675309;
+    int scamblerSeed = 999;
 
     //Open Pipes (if applicable)
 	#ifdef CYCLOPS_ASCII_SHARED_MEM
@@ -139,6 +140,14 @@ void* mainThread_fastPPS(void* argsUncast){
     TX_SYMBOL_DATATYPE* txModMode_srcArray;
     int txPacketLen = 0;
 
+    //Create scrambler string 
+    srand(scamblerSeed);
+    unsigned char scrablerStream[MAX_PAYLOAD_PLUS_CRC_LEN];
+    for(int i = 0; i<MAX_PAYLOAD_PLUS_CRC_LEN; i++){
+        int randNum = rand()%256;
+        scrablerStream[i] = *((char*) &randNum);
+    }
+
     if(txFifoName != NULL){
         pktSrcArraySymbolsPerAllocPkt = MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL;
         if(TX_DEMO_BLOCK_SIZE>pktSrcArraySymbolsPerAllocPkt) {
@@ -159,7 +168,7 @@ void* mainThread_fastPPS(void* argsUncast){
             TX_SYMBOL_DATATYPE* txPkt = txPacket_srcArray+pktSrcArraySymbolsPerAllocPkt*i;
             TX_MODTYPE_DATATYPE* txModMode = txModMode_srcArray+pktSrcArraySymbolsPerAllocPkt*i;
             int msgBytesRead = 0;
-            int pktLen = createRawCyclopsFrame(txPkt, txModMode, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+            int pktLen = createRawCyclopsFrame(txPkt, txModMode, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead, scrablerStream); //Encode a BPSK Packet
             if(i == 0) {
                 txPacketLen = pktLen;
             }else if(pktLen != txPacketLen) {
@@ -587,9 +596,9 @@ void* mainThread_fastPPS(void* argsUncast){
 
             //Print packets
             #ifdef MULTI_CH
-            processPacketsNoIDCheck(rx_packet_buffer_states, 4, TX_ID_MAX, &currentBuffer, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT, pktRxCounterTotal);
+            processPacketsNoIDCheck(rx_packet_buffer_states, scrablerStream, 4, TX_ID_MAX, &currentBuffer, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT, pktRxCounterTotal);
             #else
-            processPacketsNoIDCheck(rx_packet_buffer_states, 1, TX_ID_MAX, &currentBuffer, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT, pktRxCounterTotal);
+            processPacketsNoIDCheck(rx_packet_buffer_states, scrablerStream, 1, TX_ID_MAX, &currentBuffer, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT, pktRxCounterTotal);
             #endif
         }
     }

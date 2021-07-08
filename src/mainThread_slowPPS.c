@@ -126,6 +126,15 @@ void* mainThread_slowPPS(void* argsUncast){
 
     char* blankStr = "";
 
+    int scamblerSeed = 999;
+    //Create scrambler string 
+    srand(scamblerSeed);
+    unsigned char scrablerStream[MAX_PAYLOAD_PLUS_CRC_LEN];
+    for(int i = 0; i<MAX_PAYLOAD_PLUS_CRC_LEN; i++){
+        int randNum = rand()%256;
+        scrablerStream[i] = *((char*) &randNum);
+    }
+
     //If transmitting, allocate arrays and form a Tx packet
     if(txFifoName != NULL){
         txPacket_ch0 = (TX_SYMBOL_DATATYPE*) malloc(sizeof(TX_SYMBOL_DATATYPE)*MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL);
@@ -141,11 +150,11 @@ void* mainThread_slowPPS(void* argsUncast){
 
         //Create a temporary packet to be used when sending a blank signal
         //TODO: Optimize this
-        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
+        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead, scrablerStream);
         #ifdef MULTI_CH
-        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
-        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
-        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead);
+        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead, scrablerStream);
+        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead, scrablerStream);
+        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, blankStr, &msgBytesRead, scrablerStream);
         #endif
     }
 
@@ -279,7 +288,7 @@ void* mainThread_slowPPS(void* argsUncast){
                         txIndex = 0;
                         printf("\nStarting to send packet\n");
                         //Create a new packet
-                        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txPacketLen_ch0 = createRawCyclopsFrame(txPacket_ch0, txModMode_ch0, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead, scrablerStream); //Encode a BPSK Packet
                         //MsgBytesRead indicates how many bytes of the textToBeEncoded were read.  Add this to the text ptr passed to the next one
                         txStrLoc+=msgBytesRead;
                         txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
@@ -290,7 +299,7 @@ void* mainThread_slowPPS(void* argsUncast){
 
                         #ifdef MULTI_CH
 
-                        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txPacketLen_ch1 = createRawCyclopsFrame(txPacket_ch1, txModMode_ch1, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead, scrablerStream); //Encode a BPSK Packet
                         txStrLoc+=msgBytesRead;
                         txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
                         if(txStrLoc>=txStrLen){
@@ -298,7 +307,7 @@ void* mainThread_slowPPS(void* argsUncast){
                             txStrLoc = 0;
                         }
 
-                        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txPacketLen_ch2 = createRawCyclopsFrame(txPacket_ch2, txModMode_ch2, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead, scrablerStream); //Encode a BPSK Packet
                         txStrLoc+=msgBytesRead;
                         txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
                         if(txStrLoc>=txStrLen){
@@ -306,7 +315,7 @@ void* mainThread_slowPPS(void* argsUncast){
                             txStrLoc = 0;
                         }
 
-                        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead); //Encode a BPSK Packet
+                        txPacketLen_ch3 = createRawCyclopsFrame(txPacket_ch3, txModMode_ch3, txID, txID, txID, BITS_PER_SYMBOL_PAYLOAD_TX, txStr+txStrLoc, &msgBytesRead, scrablerStream); //Encode a BPSK Packet
                         txStrLoc+=msgBytesRead;
                         txID = txID<TX_ID_MAX-1 ? txID+1 : 0;
                         if(txStrLoc>=txStrLen){
@@ -558,9 +567,9 @@ void* mainThread_slowPPS(void* argsUncast){
 
             //Check recieved packets and print
             #ifdef MULTI_CH
-            processPackets(rx_packet_buffer_states, 4, &currentID, TX_ID_MAX, &currentBuffer, &failureCount, RX_MAX_FAILURES, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT);
+            processPackets(rx_packet_buffer_states, scrablerStream, 4, &currentID, TX_ID_MAX, &currentBuffer, &failureCount, RX_MAX_FAILURES, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT);
             #else
-            processPackets(rx_packet_buffer_states, 1, &currentID, TX_ID_MAX, &currentBuffer, &failureCount, RX_MAX_FAILURES, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT);
+            processPackets(rx_packet_buffer_states, scrablerStream, 1, &currentID, TX_ID_MAX, &currentBuffer, &failureCount, RX_MAX_FAILURES, PRINT_RX_TITLE, PRINT_RX_DETAILS, PRINT_RX_CONTENT);
             #endif
         }
     }
