@@ -318,6 +318,8 @@ void* mainThread_fastPPS(void* argsUncast){
 
     int outstandingBal = 0;
 
+    bool checkBlanks = true;
+
     //Main Loop
     bool running = true;
     while(running){
@@ -373,9 +375,13 @@ void* mainThread_fastPPS(void* argsUncast){
                     //We are done sending the packet
 
                     //TODO: Remove assertion
-                    if(blankCount != 0 && (txIndex>=txPacketLen && blankCount!=pktBlankPadding)){
-                        printf("Unexpected number of blanks sent in normal packet Tx: %d != %d\n", blankCount, pktBlankPadding);
-                        exit(1);
+                    if(checkBlanks){
+                        if(blankCount != 0 && (txIndex>=txPacketLen && blankCount!=pktBlankPadding)){
+                            printf("Unexpected number of blanks sent in normal packet Tx: %d != %d\n", blankCount, pktBlankPadding);
+                            exit(1);
+                        }
+
+                        checkBlanks=false; //Do not check after we start sending blank frames
                     }
 
                     //We may be sending blanks, or we may need to select a new packet to send
@@ -397,10 +403,16 @@ void* mainThread_fastPPS(void* argsUncast){
                     }
 
                     //Check if after sending blanks (if applicable) new packet(s) need to be chosen
-                    if(blankCount>=extraBlanksRequiredRounded) {
+                    if(blankCount>=extraBlanksRequiredRoundedIncludingPadding) {
                         //Reset Tx state for next transmission
                         txIndex = 0;
                         blankCount = 0;
+                        checkBlanks=true;
+
+                        if(blankCount>extraBlanksRequiredRoundedIncludingPadding){
+                            printf("Unexpected number of blanks sent: %d != %d\n", blankCount, extraBlanksRequiredRoundedIncludingPadding);
+                            exit(1);
+                        }
 
                         //Select new packets
                         int pktInd_ch0 = rand()%numTxPktsToCreate;
