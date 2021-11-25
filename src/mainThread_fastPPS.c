@@ -219,7 +219,7 @@ void* mainThread_fastPPS(void* argsUncast){
     int blankLen = (int) round(blankLenDbl);
 
     //Because of block quantization, there may be some unavoidable blank samples at the end of a packet
-    int pktBlankPadding = txPacketLen%TX_BLOCK_SIZE;
+    int pktBlankPadding = txPacketLen%TX_BLOCK_SIZE == 0 ? 0 : TX_BLOCK_SIZE - (txPacketLen%TX_BLOCK_SIZE);
 
     int extraBlanksRequired = blankLen-pktBlankPadding;
     //Note, it is possible for this to be negative if the requested number of blanks is less than the padding required
@@ -236,6 +236,7 @@ void* mainThread_fastPPS(void* argsUncast){
     }
     int extraBlankBlocksRequired = (int) round(((double) extraBlanksRequired)/TX_BLOCK_SIZE);
     int extraBlanksRequiredRounded = extraBlankBlocksRequired*TX_BLOCK_SIZE;
+    int extraBlanksRequiredRoundedIncludingPadding = extraBlanksRequiredRounded+pktBlankPadding;
 
     if(warnDutyCycle) {
         double actualDutyCycle = ((double) txPacketLen)/(txPacketLen + pktBlankPadding + extraBlanksRequiredRounded);
@@ -375,15 +376,21 @@ void* mainThread_fastPPS(void* argsUncast){
                                             &txTokens);
                     #endif
 					txIndex += sendStatus.elementsSent;
-					// blankCount += sendStatus.blanksSent; //Do not count these.  We only track the extra blanks needed
-                    outstandingBal += sendStatus.elementsSent/TX_BLOCK_SIZE + sendStatus.blanksSent/TX_BLOCK_SIZE;
+					blankCount += sendStatus.blanksSent;
+                    outstandingBal += (sendStatus.elementsSent+sendStatus.blanksSent)/TX_BLOCK_SIZE;
                 }else{
                     //We are done sending the packet
 
+                    //TODO: Remove assertion
+                    if(blankCount != 0 && (txIndex>=txPacketLen && blankCount!=pktBlankPadding)){
+                        printf("Unexpected number of blanks sent in normal packet Tx: %d != %d\n", blankCount, pktBlankPadding);
+                        exit(1);
+                    }
+
                     //We may be sending blanks, or we may need to select a new packet to send
-                    if(blankCount < extraBlanksRequiredRounded) {
+                    if(blankCount < extraBlanksRequiredRoundedIncludingPadding) {
                         //sending blanks
-                        int blanksToRequest = extraBlanksRequiredRounded-blankCount;
+                        int blanksToRequest = -blankCount;
 
                         #ifdef CYCLOPS_ASCII_SHARED_MEM
                         int blanksSent = sendBlank(&txFifo,

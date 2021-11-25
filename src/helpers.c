@@ -75,13 +75,19 @@ sendRtn_t sendData(FILE* pipe,
              int *tokens){
 #endif
 
-    TX_STRUCTURE_TYPE_NAME txStruct[maxTokens];
+    //May not be able to fill all of the outstanding tokens (input data too short)
+    int maxBlocksAvailibleToSend = maxLenAvail/TX_BLOCK_SIZE;
+    if(maxLenAvail%TX_BLOCK_SIZE != 0){
+        maxBlocksAvailibleToSend++;
+    } 
+    int blocksToSend = maxBlocksAvailibleToSend < maxTokens ? maxBlocksAvailibleToSend : maxTokens;
+    TX_STRUCTURE_TYPE_NAME txStruct[blocksToSend];
 
     int txCursor = 0;
     int blockInd = 0;
     int blankCount = 0;
 
-    while(blockInd<maxTokens) {
+    while(blockInd<blocksToSend) {
         //Create packets to send
         #if TX_BLOCK_SIZE == 1
             if(txCursor<maxLenAvail) {
