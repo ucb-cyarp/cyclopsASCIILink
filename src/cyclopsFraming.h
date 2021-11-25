@@ -109,7 +109,7 @@ int createRawPreamble(TX_SYMBOL_DATATYPE *rawPreambleBuf, TX_MODTYPE_DATATYPE *p
  *   ************************
  *   *                      *
  *   *       Preamble       *
- *   *       2752 Symb      *
+ *   *       3776 Symb      *
  *   *         BPSK         *
  *   *                      *
  *   ************************
