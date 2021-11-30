@@ -13,29 +13,45 @@
 #include "mainThread.h"
 
 void printHelp(){
-    printf("cyclopsASCIILink <-rx rx.pipe> <-tx tx.pipe -txfb tx_feedback.pipe> <-txperiod 1.0> <-txtokens 500> <-processlimit 10>\n");
+    printf("cyclopsASCIILink <-rx rx.pipe> <-tx tx.pipe <-txfb tx_feedback.pipe> <-txperiod 1.0> <-txdutycycle 0.5> <-rxsubsampleperiod 200000> <-txtokens 500> <-processlimit 10> <-maxblocksinflight 10000>\n");
+    printf("\n");
+    printf("The application will default to using the txperiod unless a duty cycle or subsampling period are specified\n");
     printf("\n");
     printf("Optional Arguments:\n");
     printf("-rx: Path to the Rx Pipe\n");
     printf("-tx: Path to the Tx Pipe\n");
     printf("-txfb: Path to the Tx Feedback Pipe (required if -tx is present)\n");
     printf("-txperiod: The period (in seconds) between packet transmission\n");
+    printf("-txdutycycle: The duty cycle of packet transmission (cannot be combined with -txdutycycle)\n");
+    printf("-rxsubsampleperiod: Print every nth packet when used with -txdutycycle\n");
     printf("-txtokens: The number of initial Tx tokens (in blocks).  Tokens are replenished via the feedback pipe\n");
     printf("-processlimit: The maximum number of blocks to process at one time\n");
-    printf("-cpu: CPU to run this application on\n");
+    printf("-maxblocksinflight: The maximum number of blocks allowed to be in flight between the Tx and Rx (May potentially have an additional txTokens-1 in flight) (<= 0 disables check).  Similar to -txtokens except that this extends completely from the Tx to the Rx\n");
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+	printf("-fifosize: The size of the FIFO in blocks\n");
+	#endif
+    printf("-cpu: CPU to run this application on (negative number to not pin to a particular CPU, does not apply to MacOS)\n");
 }
 
 int main(int argc, char **argv) {
     //--- Parse the arguments ---
-    char *txPipeName = NULL;
-    char *txFeedbackPipeName = NULL;
-    char *rxPipeName = NULL;
+    char *txFifoName = NULL;
+    char *txFeedbackFifoName = NULL;
+    char *rxFifoName = NULL;
 
     double txPeriod = 1.0;
+    double txDutyCycle = 0.5;
+    int64_t rxSubsamplePeriod = 200000;
     int32_t txTokens = 500;
+    int32_t maxBlocksInFlight = -1;
     int32_t maxBlocksToProcess = 10;
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+    	int32_t fifoSize = 8;
+	#endif
     int cpu = -1;
     TX_GAIN_DATATYPE gain = 1;  //TODO: Add to parameters list
+    bool useDutyCycle = false;
+    bool useTxPeriod = false;
 
     if(argc < 2){
         printHelp();
@@ -51,7 +67,7 @@ int main(int argc, char **argv) {
             }
 
             if(i<argc){
-                rxPipeName = argv[i];
+                rxFifoName = argv[i];
             }else{
                 printf("Missing argument for -rx\n");
                 exit(1);
@@ -65,7 +81,7 @@ int main(int argc, char **argv) {
             }
 
             if(i<argc){
-                txPipeName = argv[i];
+                txFifoName = argv[i];
             }else{
                 printf("Missing argument for -tx\n");
                 exit(1);
@@ -79,7 +95,7 @@ int main(int argc, char **argv) {
             }
 
             if(i<argc){
-                txFeedbackPipeName = argv[i];
+                txFeedbackFifoName = argv[i];
             }else{
                 printf("Missing argument for -txfb\n");
                 exit(1);
@@ -96,11 +112,54 @@ int main(int argc, char **argv) {
                 txPeriod = strtod(argv[i], NULL);
                 if(txPeriod<=0){
                     printf("-txperiod must be positive\n");
+                    exit(1);
                 }
             }else{
                 printf("Missing argument for -txperiod\n");
                 exit(1);
             }
+
+            useTxPeriod = true;
+        }else if(strcmp("-txdutycycle", argv[i]) == 0){
+            i++; //Get the actual argument
+
+            if(!TX_AVAILABLE){
+                printf("Tx is unavailable in current configuration\n");
+                exit(1);
+            }
+
+            if(i<argc){
+                txDutyCycle = strtod(argv[i], NULL);
+                if(txPeriod<=0){
+                    printf("-txdutycycle must be positive\n");
+                    exit(1);
+                }
+            }else{
+                printf("Missing argument for -txdutycycle\n");
+                exit(1);
+            }
+
+            useDutyCycle = true;
+        }else if(strcmp("-rxsubsampleperiod", argv[i]) == 0){
+            i++; //Get the actual argument
+
+            if(!RX_AVAILABLE){
+                printf("Rx is unavailable in current configuration\n");
+                exit(1);
+            }
+
+            if(i<argc){
+                rxSubsamplePeriod = atoi(argv[i]);
+                if(rxSubsamplePeriod<0){
+                    printf("-rxsubsampleperiod must be >= 0\n");
+                    exit(1);
+                }
+            }else{
+                printf("Missing argument for -rxsubsampleperiod\n");
+                exit(1);
+            }
+
+            useDutyCycle = true;
         }else if(strcmp("-txtokens", argv[i]) == 0){
             i++; //Get the actual argument
 
@@ -113,11 +172,26 @@ int main(int argc, char **argv) {
                 txTokens = strtol(argv[i], NULL, 10);
                 if(txTokens<=0){
                     printf("-txtokens must be positive\n");
+                    exit(1);
                 }
             }else{
                 printf("Missing argument for -txtokens\n");
                 exit(1);
             }
+		#ifdef CYCLOPS_ASCII_SHARED_MEM
+        }else if(strcmp("-fifosize", argv[i]) == 0){
+            i++; //Get the actual argument
+
+            if(i<argc){
+                fifoSize = strtol(argv[i], NULL, 10);
+                if(fifoSize <= 0){
+                    printf("-fifosize must be positive\n");
+                }
+            }else{
+                printf("Missing argument for -fifosize\n");
+                exit(1);
+            }
+		#endif
         }else if(strcmp("-processlimit", argv[i]) == 0) {
             i++; //Get the actual argument
 
@@ -135,14 +209,25 @@ int main(int argc, char **argv) {
                 printf("Missing argument for -processlimit\n");
                 exit(1);
             }
+        }else if(strcmp("-maxblocksinflight", argv[i]) == 0) {
+            i++; //Get the actual argument
+
+            if (!TX_AVAILABLE) {
+                printf("Tx is unavailable in current configuration\n");
+                exit(1);
+            }
+
+            if (i < argc) {
+                maxBlocksInFlight = strtol(argv[i], NULL, 10);
+            } else {
+                printf("Missing argument for -maxblocksinflight\n");
+                exit(1);
+            }
         }else if(strcmp("-cpu", argv[i]) == 0) {
             i++; //Get the actual argument
 
             if (i < argc) {
                 cpu = strtol(argv[i], NULL, 10);
-                if (cpu <= 0) {
-                    printf("-cpu must be non-negative\n");
-                }
             } else {
                 printf("Missing argument for -cpu\n");
                 exit(1);
@@ -152,28 +237,38 @@ int main(int argc, char **argv) {
         }
     }
 
-    if((txPipeName == NULL && txFeedbackPipeName != NULL) || (txPipeName != NULL && txFeedbackPipeName == NULL)){
+    if((txFifoName == NULL && txFeedbackFifoName != NULL) || (txFifoName != NULL && txFeedbackFifoName == NULL)){
         printf("-tx and -txfb must come as a pair\n");
         exit(1);
     }
 
-    if(txPipeName == NULL && rxPipeName == NULL){
+    if(txFifoName == NULL && rxFifoName == NULL){
         exit(0);
+    }
+
+    if(useTxPeriod && useDutyCycle){
+        printf("-txdutycycle and/or -rxsubsampleperiod cannot be used in combination with -txperiod\n");
+        exit(1);
     }
 
     //Create Thread Args
     threadArgs_t threadArgs;
-    threadArgs.txPipeName=txPipeName;
-    threadArgs.txFeedbackPipeName=txFeedbackPipeName;
-    threadArgs.rxPipeName=rxPipeName;
+    threadArgs.txFifoName=txFifoName;
+    threadArgs.txFeedbackFifoName=txFeedbackFifoName;
+    threadArgs.rxFifoName=rxFifoName;
 
     threadArgs.txPeriod=txPeriod;
     threadArgs.txTokens=txTokens;
+    threadArgs.maxBlocksInFlight=maxBlocksInFlight;
     threadArgs.maxBlocksToProcess=maxBlocksToProcess;
+	#ifdef CYCLOPS_ASCII_SHARED_MEM
+    	threadArgs.fifoSize=fifoSize;
+	#endif
     threadArgs.gain=gain;
+    threadArgs.txDutyCycle=txDutyCycle;
+    threadArgs.rxSubsamplePeriod=rxSubsamplePeriod;
 
     //Create Thread
-    cpu_set_t cpuset_app;
     pthread_t thread_app;
     pthread_attr_t attr_app;
 
@@ -184,19 +279,34 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    //Set Thread CPU
-    if(cpu>=0) {
-        CPU_ZERO(&cpuset_app); //Clear cpuset
-        CPU_SET(cpu, &cpuset_app); //Add CPU to cpuset
-        status = pthread_attr_setaffinity_np(&attr_app, sizeof(cpu_set_t), &cpuset_app);//Set thread CPU affinity
-        if (status != 0) {
-            printf("Could not set thread core affinity ... exiting");
-            exit(1);
+    #ifdef __APPLE__
+        printf("Warning: On MacOS, CPU parameter is ignored\n");
+    #else
+        //Can't set thread affinity on MacOS
+
+        if(cpu >= 0){
+            cpu_set_t cpuset_app;
+            
+            //Set Thread CPU
+            if(cpu>=0) {
+                CPU_ZERO(&cpuset_app); //Clear cpuset
+                CPU_SET(cpu, &cpuset_app); //Add CPU to cpuset
+                status = pthread_attr_setaffinity_np(&attr_app, sizeof(cpu_set_t), &cpuset_app);//Set thread CPU affinity
+                if (status != 0) {
+                    printf("Could not set thread core affinity ... exiting");
+                    exit(1);
+                }
+            }
         }
-    }
+    #endif
 
     //Start Thread
-    status = pthread_create(&thread_app, &attr_app, mainThread, &threadArgs);
+    if(useDutyCycle){
+        status = pthread_create(&thread_app, &attr_app, mainThread_fastPPS, &threadArgs);
+    }else{
+        //Defaults to using Tx period
+        status = pthread_create(&thread_app, &attr_app, mainThread_slowPPS, &threadArgs);
+    }
     if(status != 0)
     {
         printf("Could not create a thread ... exiting");
