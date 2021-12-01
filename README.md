@@ -1,5 +1,5 @@
 # cyclopsASCIILink
-[![Build Status](https://travis-ci.com/ucb-cyarp/cyclopsASCIILink.svg?token=3DFsVQ6rTxi6J46pKtZ6&branch=master)](https://travis-ci.com/ucb-cyarp/cyclopsASCIILink)
+[![CMake CI](https://github.com/ucb-cyarp/cyclopsASCIILink/actions/workflows/cmake.yml/badge.svg?branch=master)](https://github.com/ucb-cyarp/cyclopsASCIILink/actions/workflows/cmake.yml)
  
 This is an example application of the Cyclops baseband which consists of sending ASCII text in a unidirectional communications channel.
  
