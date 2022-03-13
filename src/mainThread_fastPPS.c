@@ -141,7 +141,7 @@ void* mainThread_fastPPS(void* argsUncast){
 
     if(txFifoName != NULL){
         pktSrcArraySymbolsPerAllocPkt = MAX_PACKET_SYMBOL_LEN*TX_REPITIONS_PER_SYMBOL;
-        if(TX_DEMO_BLOCK_SIZE>pktSrcArraySymbolsPerAllocPkt) {
+        if(TX_BLOCK_SIZE>pktSrcArraySymbolsPerAllocPkt) {
             printf("Block size must be <= the packet length in symbols\n");
             exit(1);
         }

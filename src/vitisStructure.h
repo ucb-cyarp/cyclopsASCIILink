@@ -9,10 +9,10 @@
 
 // ** This file should be modified to include the header definition for the vitis I/O Pipes **
 #include "vitisIncludes/vitisTypes.h"
-#include "vitisIncludes/rx_demo_io_linux_pipe.h"
-#include "vitisIncludes/tx_demo_io_linux_pipe.h"
-#include "vitisIncludes/rx_demo_parameters.h"
-#include "vitisIncludes/tx_demo_parameters.h"
+#include "vitisIncludes/rx_demo_inst2_io_linux_pipe.h"
+#include "vitisIncludes/tx_demo_inst2_io_linux_pipe.h"
+#include "vitisIncludes/rx_demo_inst2_parameters.h"
+#include "vitisIncludes/tx_demo_inst2_parameters.h"
 
 #define BOOL_TYPE vitisBool_t
 
@@ -21,10 +21,10 @@
 #define TX_AVAILABLE true
 
 //Tx Structure
-#define TX_STRUCTURE_TYPE_NAME tx_demo_inputs_bundle_1_t
+#define TX_STRUCTURE_TYPE_NAME tx_demo_inst2_inputs_bundle_1_t
 
 //Tx BlockSize
-#define TX_BLOCK_SIZE TX_DEMO_INPUT_BUNDLE1_BLOCKSIZE
+#define TX_BLOCK_SIZE TX_DEMO_INST2_INPUT_BUNDLE1_BLOCKSIZE
 //Tx Symbol
 #define TX_SYMBOL_DATATYPE uint8_t
 #define TX_SYMBOL_BLANK_VAL 0
@@ -69,8 +69,8 @@
 #define RX_AVAILABLE true
 #define RX_PACKED_BITS 4 //There are 4 bits per packed
 
-#define RX_BLOCK_SIZE RX_DEMO_OUTPUT_BUNDLE1_BLOCKSIZE
-#define RX_STRUCTURE_TYPE_NAME rx_demo_outputs_bundle_1_t
+#define RX_BLOCK_SIZE RX_DEMO_INST2_OUTPUT_BUNDLE1_BLOCKSIZE
+#define RX_STRUCTURE_TYPE_NAME rx_demo_inst2_outputs_bundle_1_t
 
 #define RX_PACKED_DATATYPE uint8_t
 #define RX_STROBE_DATATYPE BOOL_TYPE
